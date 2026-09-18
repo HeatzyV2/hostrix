@@ -59,6 +59,15 @@ func NewServer(cfg *config.Config, db *gorm.DB) *Server {
 	mux.HandleFunc("GET /api/v1/servers/{id}/metrics", s.handleServerMetrics)
 	mux.HandleFunc("GET /api/v1/servers/{id}/console", s.handleConsoleTicket)
 	mux.HandleFunc("GET /api/v1/servers/{id}/console/ws", s.handleConsoleWS)
+	mux.HandleFunc("GET /api/v1/servers/{id}/files", s.handleListServerFiles)
+	mux.HandleFunc("POST /api/v1/servers/{id}/files/write", s.handleWriteServerFile)
+	mux.HandleFunc("POST /api/v1/servers/{id}/files/mkdir", s.handleMkdirServerFile)
+	mux.HandleFunc("POST /api/v1/servers/{id}/files/rename", s.handleRenameServerFile)
+	mux.HandleFunc("POST /api/v1/servers/{id}/files/move", s.handleMoveServerFile)
+	mux.HandleFunc("DELETE /api/v1/servers/{id}/files", s.handleDeleteServerFile)
+	mux.HandleFunc("GET /api/v1/servers/{id}/files/download", s.handleDownloadServerFile)
+	mux.HandleFunc("POST /api/v1/servers/{id}/files/upload", s.handleUploadServerFile)
+	mux.HandleFunc("POST /api/v1/servers/{id}/files/extract", s.handleExtractServerFile)
 
 	s.httpServer = &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -115,7 +124,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, code, map[string]any{
 		"status":  status,
 		"service": "hostrix-api",
-		"version": "0.3.0",
+		"version": "0.4.0",
 	})
 }
 

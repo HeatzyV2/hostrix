@@ -62,3 +62,12 @@ func SanitizeContainerPath(p string) (string, error) {
 	}
 	return cleaned, nil
 }
+
+// SanitizeContainerPathAllowRoot is like SanitizeContainerPath but allows "/".
+func SanitizeContainerPathAllowRoot(p string) (string, error) {
+	p = strings.TrimSpace(p)
+	if p == "" || p == "/" {
+		return "/", nil
+	}
+	return SanitizeContainerPath(p)
+}

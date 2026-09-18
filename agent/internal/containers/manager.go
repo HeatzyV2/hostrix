@@ -41,6 +41,17 @@ type HostMetrics struct {
 	Containers       int     `json:"containers"`
 }
 
+// DirEntry is a single entry returned by ListDir.
+type DirEntry struct {
+	Name string `json:"name"`
+	Type string `json:"type"` // file, directory, symlink
+	Mode int    `json:"mode"`
+	Size int64  `json:"size"`
+}
+
+// MaxFileBytes caps read/write/upload payloads (32 MiB).
+const MaxFileBytes = 32 << 20
+
 // ContainerManager abstracts the runtime (Incus today).
 type ContainerManager interface {
 	CreateContainer(ctx context.Context, req CreateRequest) error
@@ -55,5 +66,9 @@ type ContainerManager interface {
 	ReadFile(ctx context.Context, name string, path string) ([]byte, error)
 	WriteFile(ctx context.Context, name string, path string, data []byte) error
 	DeleteFile(ctx context.Context, name string, path string) error
+	ListDir(ctx context.Context, name string, path string) ([]DirEntry, error)
+	Mkdir(ctx context.Context, name string, path string) error
+	RenameFile(ctx context.Context, name string, from string, to string) error
+	ExtractArchive(ctx context.Context, name string, archivePath string, destDir string) error
 	HostMetrics(ctx context.Context) (*HostMetrics, error)
 }

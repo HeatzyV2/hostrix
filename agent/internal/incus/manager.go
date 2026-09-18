@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -273,12 +275,18 @@ func (m *Manager) ReadFile(ctx context.Context, name string, filePath string) ([
 	if err != nil {
 		return nil, err
 	}
-	reader, _, err := srv.GetInstanceFile(name, clean)
+	reader, info, err := srv.GetInstanceFile(name, clean)
 	if err != nil {
 		return nil, err
 	}
+	if info != nil && info.Type == "directory" {
+		return nil, fmt.Errorf("path is a directory")
+	}
+	if reader == nil {
+		return nil, fmt.Errorf("empty file response")
+	}
 	defer reader.Close()
-	return io.ReadAll(io.LimitReader(reader, 32<<20)) // 32 MiB cap
+	return io.ReadAll(io.LimitReader(reader, containers.MaxFileBytes))
 }
 
 func (m *Manager) WriteFile(ctx context.Context, name string, filePath string, data []byte) error {
@@ -289,7 +297,7 @@ func (m *Manager) WriteFile(ctx context.Context, name string, filePath string, d
 	if err != nil {
 		return err
 	}
-	if len(data) > 32<<20 {
+	if len(data) > containers.MaxFileBytes {
 		return fmt.Errorf("file too large")
 	}
 	srv, err := m.connect()
@@ -316,6 +324,175 @@ func (m *Manager) DeleteFile(ctx context.Context, name string, filePath string) 
 		return err
 	}
 	return srv.DeleteInstanceFile(name, clean)
+}
+
+func (m *Manager) ListDir(ctx context.Context, name string, dirPath string) ([]containers.DirEntry, error) {
+	if err := containers.ValidateContainerName(name); err != nil {
+		return nil, err
+	}
+	clean, err := containers.SanitizeContainerPathAllowRoot(dirPath)
+	if err != nil {
+		return nil, err
+	}
+	srv, err := m.connect()
+	if err != nil {
+		return nil, err
+	}
+
+	sftpClient, err := srv.GetInstanceFileSFTP(name)
+	if err != nil {
+		return m.listDirViaGet(name, clean)
+	}
+	defer sftpClient.Close()
+
+	infos, err := sftpClient.ReadDir(clean)
+	if err != nil {
+		return nil, fmt.Errorf("list dir: %w", err)
+	}
+	out := make([]containers.DirEntry, 0, len(infos))
+	for _, fi := range infos {
+		entryType := "file"
+		mode := fi.Mode()
+		if mode.IsDir() {
+			entryType = "directory"
+		} else if mode&os.ModeSymlink != 0 {
+			entryType = "symlink"
+		}
+		out = append(out, containers.DirEntry{
+			Name: fi.Name(),
+			Type: entryType,
+			Mode: int(mode.Perm()),
+			Size: fi.Size(),
+		})
+	}
+	return out, nil
+}
+
+func (m *Manager) listDirViaGet(name, clean string) ([]containers.DirEntry, error) {
+	srv, err := m.connect()
+	if err != nil {
+		return nil, err
+	}
+	reader, info, err := srv.GetInstanceFile(name, clean)
+	if err != nil {
+		return nil, err
+	}
+	if reader != nil {
+		_ = reader.Close()
+	}
+	if info == nil || info.Type != "directory" {
+		return nil, fmt.Errorf("path is not a directory")
+	}
+	out := make([]containers.DirEntry, 0, len(info.Entries))
+	for _, ent := range info.Entries {
+		base := path.Base(ent)
+		if base == "" || base == "." || base == ".." {
+			continue
+		}
+		out = append(out, containers.DirEntry{Name: base, Type: "file"})
+	}
+	return out, nil
+}
+
+func (m *Manager) Mkdir(ctx context.Context, name string, dirPath string) error {
+	if err := containers.ValidateContainerName(name); err != nil {
+		return err
+	}
+	clean, err := containers.SanitizeContainerPath(dirPath)
+	if err != nil {
+		return err
+	}
+	if clean == "/" {
+		return fmt.Errorf("cannot create root")
+	}
+	srv, err := m.connect()
+	if err != nil {
+		return err
+	}
+	return srv.CreateInstanceFile(name, clean, incus.InstanceFileArgs{
+		Mode: 0o755,
+		Type: "directory",
+	})
+}
+
+func (m *Manager) RenameFile(ctx context.Context, name string, from string, to string) error {
+	if err := containers.ValidateContainerName(name); err != nil {
+		return err
+	}
+	src, err := containers.SanitizeContainerPath(from)
+	if err != nil {
+		return fmt.Errorf("from: %w", err)
+	}
+	dst, err := containers.SanitizeContainerPath(to)
+	if err != nil {
+		return fmt.Errorf("to: %w", err)
+	}
+	if src == dst {
+		return fmt.Errorf("source and destination are the same")
+	}
+	if src == "/" || dst == "/" {
+		return fmt.Errorf("cannot rename root")
+	}
+	srv, err := m.connect()
+	if err != nil {
+		return err
+	}
+	sftpClient, err := srv.GetInstanceFileSFTP(name)
+	if err != nil {
+		return fmt.Errorf("sftp: %w", err)
+	}
+	defer sftpClient.Close()
+	if err := sftpClient.Rename(src, dst); err != nil {
+		return fmt.Errorf("rename: %w", err)
+	}
+	return nil
+}
+
+func (m *Manager) ExtractArchive(ctx context.Context, name string, archivePath string, destDir string) error {
+	if err := containers.ValidateContainerName(name); err != nil {
+		return err
+	}
+	archive, err := containers.SanitizeContainerPath(archivePath)
+	if err != nil {
+		return fmt.Errorf("archive: %w", err)
+	}
+	dest, err := containers.SanitizeContainerPathAllowRoot(destDir)
+	if err != nil {
+		return fmt.Errorf("destination: %w", err)
+	}
+
+	lower := strings.ToLower(archive)
+	var cmd []string
+	switch {
+	case strings.HasSuffix(lower, ".zip"):
+		cmd = []string{"unzip", "-o", archive, "-d", dest}
+	case strings.HasSuffix(lower, ".tar.gz"), strings.HasSuffix(lower, ".tgz"):
+		cmd = []string{"tar", "-xzf", archive, "-C", dest}
+	case strings.HasSuffix(lower, ".tar.bz2"), strings.HasSuffix(lower, ".tbz2"):
+		cmd = []string{"tar", "-xjf", archive, "-C", dest}
+	case strings.HasSuffix(lower, ".tar.xz"), strings.HasSuffix(lower, ".txz"):
+		cmd = []string{"tar", "-xJf", archive, "-C", dest}
+	case strings.HasSuffix(lower, ".tar"):
+		cmd = []string{"tar", "-xf", archive, "-C", dest}
+	default:
+		return fmt.Errorf("unsupported archive type (use tar, tar.gz, or zip)")
+	}
+	if cmd[0] != "tar" && cmd[0] != "unzip" {
+		return fmt.Errorf("extract command not allowed")
+	}
+
+	stdout, stderr, err := m.ExecuteCommand(ctx, name, cmd)
+	if err != nil {
+		msg := strings.TrimSpace(stderr)
+		if msg == "" {
+			msg = strings.TrimSpace(stdout)
+		}
+		if msg == "" {
+			msg = err.Error()
+		}
+		return fmt.Errorf("extract failed: %s", msg)
+	}
+	return nil
 }
 
 func (m *Manager) HostMetrics(ctx context.Context) (*containers.HostMetrics, error) {

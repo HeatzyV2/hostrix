@@ -105,10 +105,13 @@ Phase 1 est développable sans Incus. L’API doit démarrer avec MariaDB access
 - [x] Métriques réelles Incus (CPU delta, RAM, disk, network)
 - [x] Dashboard alimenté par heartbeats Nodes (pas de fausses stats)
 
-### Phase 4 — Files manager
+### Phase 4 — Files manager *(terminée côté code)*
 
-- list / upload / download / write / delete / rename / move
-- Protection path traversal stricte
+- [x] list / upload / download / write / delete / rename / move
+- [x] Protection path traversal stricte (`SanitizeContainerPath`)
+- [x] Agent file routes + Incus SFTP / file API
+- [x] API proxy `/api/v1/servers/{id}/files...` (auth + CanAccess)
+- [x] Panel file manager (breadcrumb, editor, extract)
 
 ### Phase 5 — Templates
 

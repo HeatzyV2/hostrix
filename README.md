@@ -4,7 +4,7 @@
 
 Hostrix is an open-source, self-hosted hosting panel for managing Linux workloads in LXC containers via [Incus](https://linuxcontainers.org/incus/). It is a modern, simplified alternative to Pterodactyl — without Docker/Wings and without any Hostrix SaaS dependency.
 
-> Status: **Phase 3** — console WebSocket, live Incus metrics, server detail UI.
+> Status: **Phase 4** — container file manager (list, upload, download, edit, extract).
 
 ## One-liner install (Linux)
 
@@ -31,7 +31,7 @@ systemctl enable --now hostrix-agent
 ```
 
 4. Confirm the node shows **ONLINE**, then create a server from `/servers`.
-5. Open a server detail page for live metrics and an interactive console.
+5. Open a server detail page for live metrics, an interactive console, and the file manager.
 
 For the console WebSocket when the panel and API are on different origins, set:
 
@@ -130,10 +130,10 @@ Open http://localhost:3000 — default bootstrap admin is created on first API s
 
 ## Phases
 
-1. **Foundations** — API, panel, auth, MariaDB *(current)*
+1. **Foundations** — API, panel, auth, MariaDB
 2. Incus + Agent + container lifecycle
 3. Servers UI, WebSocket console, metrics
-4. File manager
+4. File manager *(current)*
 5. Templates (Minecraft, Node.js, Python, …)
 6. Backups, multi-node, advanced permissions
 
@@ -145,6 +145,7 @@ See [PLAN.md](./PLAN.md) for details.
 - Sessions use opaque tokens stored as SHA-256 hashes
 - Login is rate-limited per IP
 - No arbitrary shell execution from user input (validated internal operations only)
+- Container file paths are sanitized on the Agent; uploads capped at 32MB
 
 ## License
 

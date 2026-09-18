@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { ServerConsole } from "@/components/server-console";
 import { ServerMetrics } from "@/components/server-metrics";
+import { ServerFiles } from "@/components/server-files";
 import { useRouter } from "next/navigation";
 
 type Server = {
@@ -128,6 +129,7 @@ export function ServerDetail() {
       </div>
 
       <ServerMetrics serverId={server.uuid} />
+      <ServerFiles serverId={server.uuid} />
       <ServerConsole serverId={server.uuid} />
     </div>
   );
