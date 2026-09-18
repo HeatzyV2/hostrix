@@ -53,6 +53,18 @@ curl -fsSL https://raw.githubusercontent.com/HeatzyV2/hostrix/main/installer/ins
 
 Supported install targets: Ubuntu / Debian (amd64, arm64).
 
+## Update
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/HeatzyV2/hostrix/main/installer/update.sh | sudo bash
+```
+
+Or on an existing install:
+
+```bash
+sudo bash /opt/hostrix/installer/update.sh
+```
+
 ## Architecture
 
 ```

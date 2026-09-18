@@ -1,0 +1,27 @@
+name: WordPress
+slug: wordpress
+description: WordPress site (Nginx + PHP-FPM) on Ubuntu 24.04
+
+image:
+  os: ubuntu
+  release: "24.04"
+
+startup:
+  command: bash -lc 'php-fpm8.3 -D; exec nginx -g "daemon off;"'
+
+ports:
+  - 80
+
+environment:
+  DOCROOT: /var/www/html
+  PHP_VERSION: "8.3"
+  WORDPRESS_VERSION: latest
+  SERVER_PORT: "80"
+
+variables:
+  - RAM
+  - CPU
+  - SERVER_PORT
+  - PHP_VERSION
+  - WORDPRESS_VERSION
+  - DOCROOT
