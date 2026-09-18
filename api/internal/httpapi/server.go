@@ -60,6 +60,12 @@ func NewServer(cfg *config.Config, db *gorm.DB) *Server {
 	mux.HandleFunc("GET /api/v1/servers/{id}/console", s.handleConsoleTicket)
 	mux.HandleFunc("GET /api/v1/servers/{id}/console/ws", s.handleConsoleWS)
 
+	mux.HandleFunc("GET /api/v1/templates", s.handleListTemplates)
+	mux.HandleFunc("GET /api/v1/templates/{id}", s.handleGetTemplate)
+	mux.HandleFunc("POST /api/v1/templates", s.handleCreateTemplate)
+	mux.HandleFunc("PUT /api/v1/templates/{id}", s.handleUpdateTemplate)
+	mux.HandleFunc("DELETE /api/v1/templates/{id}", s.handleDeleteTemplate)
+
 	s.httpServer = &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           s.withMiddleware(mux),
@@ -115,7 +121,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, code, map[string]any{
 		"status":  status,
 		"service": "hostrix-api",
-		"version": "0.3.0",
+		"version": "0.5.0",
 	})
 }
 

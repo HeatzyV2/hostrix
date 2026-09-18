@@ -110,10 +110,14 @@ Phase 1 est développable sans Incus. L’API doit démarrer avec MariaDB access
 - list / upload / download / write / delete / rename / move
 - Protection path traversal stricte
 
-### Phase 5 — Templates
+### Phase 5 — Templates *(terminée côté code)*
 
-- YAML templates + Minecraft / Node.js / Python / PHP / Nginx
-- Variables `{{RAM}}`, `{{SERVER_PORT}}`, etc.
+- [x] YAML templates + Minecraft / Node.js / Python / PHP / Nginx
+- [x] Variables `{{RAM}}`, `{{SERVER_PORT}}`, etc.
+- [x] Sync `templates/` → MariaDB (upsert by slug)
+- [x] API CRUD `/api/v1/templates`
+- [x] Server create uses `template_uuid` / `template_slug`
+- [x] Panel `/templates` + create-form dropdown
 
 ### Phase 6 — Backups + multi-node + permissions avancées
 
