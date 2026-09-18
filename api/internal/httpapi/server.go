@@ -157,6 +157,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	ip := clientIP(r)
 	limiter := s.loginLimit.get(ip)
 	if !limiter.Allow() {
+		logAuthFail(ip, "too many login attempts")
 		writeError(w, http.StatusTooManyRequests, "too many login attempts")
 		return
 	}
@@ -174,6 +175,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	result, err := s.auth.Login(req.Login, req.Password, ip, r.UserAgent())
 	if errors.Is(err, users.ErrInvalidCredentials) {
+		logAuthFail(ip, "invalid credentials")
 		writeError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}

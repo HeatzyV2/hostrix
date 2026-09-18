@@ -47,6 +47,57 @@ fetch_source() {
   git -C "${HOSTRIX_INSTALL_DIR}" checkout -f FETCH_HEAD
 }
 
+ensure_fail2ban() {
+  export DEBIAN_FRONTEND=noninteractive
+  if ! command -v fail2ban-client >/dev/null 2>&1; then
+    log "Installing Fail2Ban..."
+    apt-get update -y
+    apt-get install -y fail2ban
+  fi
+  if [[ -f "${HOSTRIX_INSTALL_DIR}/installer/install.sh" ]]; then
+    # Refresh jail config by re-running the embedded function body from a small helper file if present
+    :
+  fi
+  mkdir -p /etc/fail2ban/jail.d /etc/fail2ban/filter.d /var/log/hostrix
+  cat >/etc/fail2ban/jail.d/hostrix.conf <<'EOF'
+[DEFAULT]
+bantime  = 1h
+findtime = 10m
+maxretry = 5
+backend  = systemd
+
+[sshd]
+enabled = true
+port    = ssh
+mode    = aggressive
+
+[hostrix-panel]
+enabled  = true
+port     = 3000
+filter   = hostrix-auth
+logpath  = /var/log/hostrix/auth-fail.log
+maxretry = 8
+
+[hostrix-api]
+enabled  = true
+port     = 8080
+filter   = hostrix-auth
+logpath  = /var/log/hostrix/auth-fail.log
+maxretry = 10
+EOF
+  cat >/etc/fail2ban/filter.d/hostrix-auth.conf <<'EOF'
+[Definition]
+failregex = ^.*hostrix.*(invalid credentials|unauthorized|too many login attempts).*$
+            ^.*auth_fail ip=.*$
+ignoreregex =
+EOF
+  touch /var/log/hostrix/auth-fail.log
+  chmod 640 /var/log/hostrix/auth-fail.log
+  systemctl enable --now fail2ban
+  systemctl restart fail2ban || true
+  ok "Fail2Ban ensured"
+}
+
 build_all() {
   local go
   go="$(go_bin)"
@@ -90,6 +141,7 @@ print_summary() {
 main() {
   require_root
   fetch_source
+  ensure_fail2ban
   build_all
   refresh_units
   restart_services

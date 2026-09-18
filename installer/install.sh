@@ -108,7 +108,7 @@ install_packages() {
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -y
   apt-get install -y curl ca-certificates gnupg lsb-release git build-essential \
-    openssl mariadb-server mariadb-client
+    openssl mariadb-server mariadb-client fail2ban
 
   if ! command -v go >/dev/null 2>&1 && [[ ! -x /usr/local/go/bin/go ]]; then
     log "Installing Go toolchain..."
@@ -186,6 +186,57 @@ install_incus() {
     incus admin init --auto || die "incus admin init failed"
   fi
   ok "Incus ready"
+}
+
+install_fail2ban() {
+  log "Configuring Fail2Ban..."
+  mkdir -p /etc/fail2ban/jail.d
+  cat >/etc/fail2ban/jail.d/hostrix.conf <<'EOF'
+[DEFAULT]
+bantime  = 1h
+findtime = 10m
+maxretry = 5
+backend  = systemd
+
+[sshd]
+enabled = true
+port    = ssh
+mode    = aggressive
+
+[hostrix-panel]
+enabled  = true
+port     = 3000
+filter   = hostrix-auth
+logpath  = /var/log/hostrix/auth-fail.log
+maxretry = 8
+findtime = 10m
+bantime  = 1h
+
+[hostrix-api]
+enabled  = true
+port     = 8080
+filter   = hostrix-auth
+logpath  = /var/log/hostrix/auth-fail.log
+maxretry = 10
+findtime = 10m
+bantime  = 1h
+EOF
+
+  mkdir -p /etc/fail2ban/filter.d
+  cat >/etc/fail2ban/filter.d/hostrix-auth.conf <<'EOF'
+[Definition]
+failregex = ^.*hostrix.*(invalid credentials|unauthorized|too many login attempts).*$
+            ^.*POST /api/v1/auth/login.* (401|429).*$
+ignoreregex =
+EOF
+
+  mkdir -p /var/log/hostrix
+  touch /var/log/hostrix/auth-fail.log
+  chmod 640 /var/log/hostrix/auth-fail.log
+
+  systemctl enable --now fail2ban
+  systemctl restart fail2ban
+  ok "Fail2Ban enabled (sshd + Hostrix auth jails)"
 }
 
 fetch_source() {
@@ -276,6 +327,7 @@ print_summary() {
   echo "  Admin     : admin / ${HOSTRIX_ADMIN_PASSWORD}"
   echo "  Config    : /etc/hostrix/hostrix.env"
   echo "  Install   : ${HOSTRIX_INSTALL_DIR}"
+  echo "  Fail2Ban  : sshd + hostrix-api/panel auth jails"
   echo
   echo "Next (mono-node):"
   echo "  1. Open the panel and create a Node (address 127.0.0.1, port 8081)"
@@ -292,6 +344,7 @@ main() {
   install_packages
   setup_mariadb
   install_incus
+  install_fail2ban
   fetch_source
   write_env
   build_hostrix

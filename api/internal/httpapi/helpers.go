@@ -3,9 +3,12 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/hostrix/hostrix/api/internal/auth"
 	"github.com/hostrix/hostrix/api/internal/models"
@@ -28,6 +31,19 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 func writeError(w http.ResponseWriter, code int, msg string) {
 	writeJSON(w, code, map[string]string{"error": msg})
 }
+
+// logAuthFail appends a Fail2Ban-friendly line for login abuse.
+func logAuthFail(ip, reason string) {
+	line := fmt.Sprintf("%s auth_fail ip=%s reason=%s\n", time.Now().UTC().Format(time.RFC3339), ip, reason)
+	path := "/var/log/hostrix/auth-fail.log"
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o640)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	_, _ = f.WriteString(line)
+}
+
 
 func clientIP(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
