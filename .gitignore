@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Go
+bin/
+*.exe
+*.test
+*.out
+vendor/
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+*.pem
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Hostrix runtime
+data/
+*.db
+*.log
+_bootstrap_go.mjs
+
+# Coverage
+coverage/

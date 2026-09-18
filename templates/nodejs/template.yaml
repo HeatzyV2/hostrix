@@ -1,0 +1,24 @@
+name: Node.js
+slug: nodejs
+description: Generic Node.js application
+
+image:
+  os: ubuntu
+  release: "24.04"
+
+startup:
+  command: node {{ENTRYPOINT}}
+
+ports:
+  - 3000
+
+environment:
+  ENTRYPOINT: index.js
+  NODE_VERSION: "22"
+
+variables:
+  - RAM
+  - CPU
+  - SERVER_PORT
+  - NODE_VERSION
+  - ENTRYPOINT

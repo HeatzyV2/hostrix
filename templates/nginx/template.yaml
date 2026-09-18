@@ -1,0 +1,18 @@
+name: Nginx
+slug: nginx
+description: Static site / reverse proxy with Nginx
+
+image:
+  os: ubuntu
+  release: "24.04"
+
+startup:
+  command: nginx -g 'daemon off;'
+
+ports:
+  - 80
+
+variables:
+  - RAM
+  - CPU
+  - SERVER_PORT

@@ -1,0 +1,26 @@
+# Minecraft Java — Hostrix template (Phase 5 wiring)
+name: Minecraft Java
+slug: minecraft-java
+description: Vanilla / Paper Minecraft Java Edition server
+
+image:
+  os: ubuntu
+  release: "24.04"
+
+startup:
+  command: java -Xms{{RAM}}M -Xmx{{RAM}}M -jar {{SERVER_JAR}} nogui
+
+ports:
+  - 25565
+
+environment:
+  SERVER_JAR: server.jar
+  JAVA_VERSION: "21"
+  MINECRAFT_VERSION: "1.21.1"
+
+variables:
+  - RAM
+  - CPU
+  - SERVER_PORT
+  - JAVA_VERSION
+  - MINECRAFT_VERSION

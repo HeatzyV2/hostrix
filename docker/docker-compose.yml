@@ -1,0 +1,21 @@
+services:
+  mariadb:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: hostrix
+      MARIADB_USER: hostrix
+      MARIADB_PASSWORD: change-me
+    ports:
+      - "3306:3306"
+    volumes:
+      - hostrix_mariadb:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  hostrix_mariadb:

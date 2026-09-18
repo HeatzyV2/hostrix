@@ -1,0 +1,19 @@
+[Unit]
+Description=Hostrix Panel
+After=network-online.target hostrix-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/hostrix/panel
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOSTRIX_API_URL=http://127.0.0.1:8080
+Environment=HOSTRIX_API_INTERNAL_URL=http://127.0.0.1:8080
+ExecStart=/usr/bin/npm run start --prefix /opt/hostrix/panel
+Restart=on-failure
+RestartSec=3
+User=root
+
+[Install]
+WantedBy=multi-user.target

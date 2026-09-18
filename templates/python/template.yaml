@@ -1,0 +1,24 @@
+name: Python
+slug: python
+description: Generic Python application
+
+image:
+  os: ubuntu
+  release: "24.04"
+
+startup:
+  command: python3 {{ENTRYPOINT}}
+
+ports:
+  - 8000
+
+environment:
+  ENTRYPOINT: main.py
+  PYTHON_VERSION: "3.12"
+
+variables:
+  - RAM
+  - CPU
+  - SERVER_PORT
+  - PYTHON_VERSION
+  - ENTRYPOINT

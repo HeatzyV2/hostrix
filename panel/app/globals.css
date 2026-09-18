@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  @apply bg-canvas text-ink antialiased;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(61, 156, 240, 0.14), transparent),
+    radial-gradient(ellipse 40% 30% at 100% 0%, rgba(40, 90, 140, 0.08), transparent);
+  background-attachment: fixed;
+}
+
+* {
+  border-color: theme("colors.line");
+}

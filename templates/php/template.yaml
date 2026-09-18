@@ -1,0 +1,24 @@
+name: PHP
+slug: php
+description: PHP application with built-in or external web server
+
+image:
+  os: ubuntu
+  release: "24.04"
+
+startup:
+  command: php -S 0.0.0.0:{{SERVER_PORT}} -t {{DOCROOT}}
+
+ports:
+  - 8080
+
+environment:
+  DOCROOT: public
+  PHP_VERSION: "8.3"
+
+variables:
+  - RAM
+  - CPU
+  - SERVER_PORT
+  - PHP_VERSION
+  - DOCROOT
