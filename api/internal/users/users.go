@@ -71,3 +71,9 @@ func FindByLogin(db *gorm.DB, login string) (*models.User, error) {
 	}
 	return &user, nil
 }
+
+func List(db *gorm.DB) ([]models.User, error) {
+	var list []models.User
+	err := db.Order("id asc").Find(&list).Error
+	return list, err
+}

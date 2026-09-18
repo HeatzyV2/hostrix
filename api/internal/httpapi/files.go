@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/hostrix/hostrix/api/internal/agentclient"
+	"github.com/hostrix/hostrix/api/internal/servers"
 )
 
 const maxUploadBytes = 32 << 20
@@ -22,7 +23,7 @@ func (s *Server) handleListServerFiles(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	srv, node, ok := s.loadAccessibleServer(w, r, user)
+	srv, node, ok := s.loadAccessibleServer(w, r, user, servers.ActionFiles)
 	if !ok {
 		return
 	}
@@ -52,7 +53,7 @@ func (s *Server) handleWriteServerFile(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	srv, node, ok := s.loadAccessibleServer(w, r, user)
+	srv, node, ok := s.loadAccessibleServer(w, r, user, servers.ActionFiles)
 	if !ok {
 		return
 	}
@@ -109,7 +110,7 @@ func (s *Server) handleMkdirServerFile(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	srv, node, ok := s.loadAccessibleServer(w, r, user)
+	srv, node, ok := s.loadAccessibleServer(w, r, user, servers.ActionFiles)
 	if !ok {
 		return
 	}
@@ -146,7 +147,7 @@ func (s *Server) handleRenameOrMoveServerFile(w http.ResponseWriter, r *http.Req
 	if !ok {
 		return
 	}
-	srv, node, ok := s.loadAccessibleServer(w, r, user)
+	srv, node, ok := s.loadAccessibleServer(w, r, user, servers.ActionFiles)
 	if !ok {
 		return
 	}
@@ -176,7 +177,7 @@ func (s *Server) handleDeleteServerFile(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		return
 	}
-	srv, node, ok := s.loadAccessibleServer(w, r, user)
+	srv, node, ok := s.loadAccessibleServer(w, r, user, servers.ActionFiles)
 	if !ok {
 		return
 	}
@@ -196,7 +197,7 @@ func (s *Server) handleDownloadServerFile(w http.ResponseWriter, r *http.Request
 	if !ok {
 		return
 	}
-	srv, node, ok := s.loadAccessibleServer(w, r, user)
+	srv, node, ok := s.loadAccessibleServer(w, r, user, servers.ActionFiles)
 	if !ok {
 		return
 	}
@@ -229,7 +230,7 @@ func (s *Server) handleUploadServerFile(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		return
 	}
-	srv, node, ok := s.loadAccessibleServer(w, r, user)
+	srv, node, ok := s.loadAccessibleServer(w, r, user, servers.ActionFiles)
 	if !ok {
 		return
 	}
@@ -283,7 +284,7 @@ func (s *Server) handleExtractServerFile(w http.ResponseWriter, r *http.Request)
 	if !ok {
 		return
 	}
-	srv, node, ok := s.loadAccessibleServer(w, r, user)
+	srv, node, ok := s.loadAccessibleServer(w, r, user, servers.ActionFiles)
 	if !ok {
 		return
 	}

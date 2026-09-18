@@ -118,9 +118,12 @@ Phase 1 est développable sans Incus. L’API doit démarrer avec MariaDB access
 - YAML templates + Minecraft / Node.js / Python / PHP / Nginx
 - Variables `{{RAM}}`, `{{SERVER_PORT}}`, etc.
 
-### Phase 6 — Backups + multi-node + permissions avancées
+### Phase 6 — Backups + multi-node + permissions avancées *(terminée côté code)*
 
-- Backups, allocations avancées, server_permissions
+- [x] Backups Incus (create / list / delete / download / restore)
+- [x] API CRUD backups + panel `/backups` + section serveur
+- [x] `server_permissions` (grant/revoke) + enforcement power/console/metrics/files
+- [x] Multi-node polish : node info dans list servers, refuse create si OFFLINE
 
 **Règle :** ne pas démarrer la phase N+1 tant que N n’est pas fonctionnelle.
 
@@ -143,8 +146,11 @@ GET  /health
 GET|POST          /servers
 GET|DELETE        /servers/:id
 POST              /servers/:id/{start|stop|restart|kill}
-GET|POST|DELETE   /servers/:id/files...
-GET               /servers/:id/metrics
+GET|POST|DELETE   /servers/:id/backups...
+POST              /servers/:id/backups/:id/restore
+GET|POST|DELETE   /servers/:id/permissions...
+GET               /backups
+GET               /users
 GET|POST|DELETE   /nodes...
 GET|POST|PUT|DELETE /templates...
 ```

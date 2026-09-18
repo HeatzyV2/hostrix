@@ -8,6 +8,7 @@ import (
 )
 
 var containerNameRe = regexp.MustCompile(`^[a-z][a-z0-9-]{1,62}$`)
+var backupNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$`)
 
 func ValidateContainerName(name string) error {
 	name = strings.TrimSpace(name)
@@ -16,6 +17,14 @@ func ValidateContainerName(name string) error {
 	}
 	if strings.Contains(name, "--") || strings.HasSuffix(name, "-") {
 		return fmt.Errorf("invalid container name")
+	}
+	return nil
+}
+
+func ValidateBackupName(name string) error {
+	name = strings.TrimSpace(name)
+	if !backupNameRe.MatchString(name) {
+		return fmt.Errorf("invalid backup name")
 	}
 	return nil
 }

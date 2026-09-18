@@ -69,6 +69,20 @@ func NewServer(cfg *config.Config, db *gorm.DB) *Server {
 	mux.HandleFunc("POST /api/v1/servers/{id}/files/upload", s.handleUploadServerFile)
 	mux.HandleFunc("POST /api/v1/servers/{id}/files/extract", s.handleExtractServerFile)
 
+	mux.HandleFunc("GET /api/v1/servers/{id}/backups", s.handleListServerBackups)
+	mux.HandleFunc("POST /api/v1/servers/{id}/backups", s.handleCreateServerBackup)
+	mux.HandleFunc("GET /api/v1/servers/{id}/backups/{backupId}", s.handleGetServerBackup)
+	mux.HandleFunc("DELETE /api/v1/servers/{id}/backups/{backupId}", s.handleDeleteServerBackup)
+	mux.HandleFunc("POST /api/v1/servers/{id}/backups/{backupId}/restore", s.handleRestoreServerBackup)
+	mux.HandleFunc("GET /api/v1/servers/{id}/backups/{backupId}/download", s.handleDownloadServerBackup)
+
+	mux.HandleFunc("GET /api/v1/servers/{id}/permissions", s.handleListPermissions)
+	mux.HandleFunc("POST /api/v1/servers/{id}/permissions", s.handleGrantPermission)
+	mux.HandleFunc("DELETE /api/v1/servers/{id}/permissions/{userId}", s.handleRevokePermission)
+
+	mux.HandleFunc("GET /api/v1/backups", s.handleListAllBackups)
+	mux.HandleFunc("GET /api/v1/users", s.handleListUsers)
+
 	s.httpServer = &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           s.withMiddleware(mux),
@@ -124,7 +138,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, code, map[string]any{
 		"status":  status,
 		"service": "hostrix-api",
-		"version": "0.4.0",
+		"version": "0.6.0",
 	})
 }
 

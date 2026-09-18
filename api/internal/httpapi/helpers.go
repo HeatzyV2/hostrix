@@ -9,6 +9,7 @@ import (
 
 	"github.com/hostrix/hostrix/api/internal/auth"
 	"github.com/hostrix/hostrix/api/internal/models"
+	"github.com/hostrix/hostrix/api/internal/servers"
 )
 
 func decodeJSON(r *http.Request, dst any) error {
@@ -76,6 +77,26 @@ func publicServer(s *models.Server) map[string]any {
 		"disk":           s.DiskMB,
 		"status":         s.Status,
 		"created_at":     s.CreatedAt,
+	}
+}
+
+func publicServerView(v *servers.ServerView) map[string]any {
+	out := publicServer(&v.Server)
+	out["node_uuid"] = v.NodeUUID
+	out["node_name"] = v.NodeName
+	out["node_status"] = v.NodeStatus
+	return out
+}
+
+func publicBackup(b *models.Backup) map[string]any {
+	return map[string]any{
+		"uuid":       b.UUID,
+		"server_id":  b.ServerID,
+		"name":       b.Name,
+		"size_bytes": b.SizeBytes,
+		"status":     b.Status,
+		"created_at": b.CreatedAt,
+		"updated_at": b.UpdatedAt,
 	}
 }
 

@@ -1,6 +1,9 @@
 package containers
 
-import "context"
+import (
+	"context"
+	"io"
+)
 
 // CreateRequest defines validated container creation parameters.
 // Callers must never pass raw user shell input.
@@ -52,6 +55,12 @@ type DirEntry struct {
 // MaxFileBytes caps read/write/upload payloads (32 MiB).
 const MaxFileBytes = 32 << 20
 
+type BackupInfo struct {
+	Name      string `json:"name"`
+	CreatedAt string `json:"created_at,omitempty"`
+	SizeBytes int64  `json:"size_bytes"`
+}
+
 // ContainerManager abstracts the runtime (Incus today).
 type ContainerManager interface {
 	CreateContainer(ctx context.Context, req CreateRequest) error
@@ -71,4 +80,10 @@ type ContainerManager interface {
 	RenameFile(ctx context.Context, name string, from string, to string) error
 	ExtractArchive(ctx context.Context, name string, archivePath string, destDir string) error
 	HostMetrics(ctx context.Context) (*HostMetrics, error)
+	CreateBackup(ctx context.Context, containerName, backupName string) (*BackupInfo, error)
+	ListBackups(ctx context.Context, containerName string) ([]BackupInfo, error)
+	GetBackup(ctx context.Context, containerName, backupName string) (*BackupInfo, error)
+	DeleteBackup(ctx context.Context, containerName, backupName string) error
+	DownloadBackup(ctx context.Context, containerName, backupName string, w io.Writer) (int64, error)
+	RestoreBackup(ctx context.Context, containerName, backupName string) error
 }
