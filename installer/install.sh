@@ -196,18 +196,19 @@ install_fail2ban() {
 bantime  = 1h
 findtime = 10m
 maxretry = 5
-backend  = systemd
 
 [sshd]
 enabled = true
 port    = ssh
 mode    = aggressive
+backend = systemd
 
 [hostrix-panel]
 enabled  = true
 port     = 3000
 filter   = hostrix-auth
 logpath  = /var/log/hostrix/auth-fail.log
+backend  = auto
 maxretry = 8
 findtime = 10m
 bantime  = 1h
@@ -217,6 +218,7 @@ enabled  = true
 port     = 8080
 filter   = hostrix-auth
 logpath  = /var/log/hostrix/auth-fail.log
+backend  = auto
 maxretry = 10
 findtime = 10m
 bantime  = 1h
@@ -225,8 +227,7 @@ EOF
   mkdir -p /etc/fail2ban/filter.d
   cat >/etc/fail2ban/filter.d/hostrix-auth.conf <<'EOF'
 [Definition]
-failregex = ^.*hostrix.*(invalid credentials|unauthorized|too many login attempts).*$
-            ^.*POST /api/v1/auth/login.* (401|429).*$
+failregex = ^\s*\S+\s+auth_fail\s+ip=<HOST>\s+reason=.*$
 ignoreregex =
 EOF
 

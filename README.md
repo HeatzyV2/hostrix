@@ -35,6 +35,8 @@ systemctl enable --now hostrix-agent
 
 Templates under `templates/*/template.yaml` are upserted into MariaDB on API start (`HOSTRIX_TEMPLATES_DIR`, default `../templates` or `/opt/hostrix/templates`). Browse them in the panel at `/templates`.
 
+Included stacks: WordPress, Dotclear (Nginx + PHP-FPM), plus base OS images. Dotclear ships with an optional in-container helper: `templates/dotclear/setup.sh {install|update}`.
+
 For the console WebSocket when the panel and API are on different origins, set:
 
 ```bash
@@ -182,6 +184,7 @@ See [PLAN.md](./PLAN.md) for details.
 - Passwords are bcrypt-hashed; never stored in plaintext
 - Sessions use opaque tokens stored as SHA-256 hashes
 - Login is rate-limited per IP
+- Installer/update auto-configures **Fail2Ban** (sshd + Hostrix auth jails on `/var/log/hostrix/auth-fail.log`)
 - No arbitrary shell execution from user input (validated internal operations only)
 - Container file paths are sanitized on the Agent; uploads capped at 32MB
 - Server shares enforce `can_start` / `can_stop` / `can_files` / `can_console` on the API
