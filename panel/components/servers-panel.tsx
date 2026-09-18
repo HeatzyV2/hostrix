@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Loader2, Plus, Play, Square, RotateCcw, Skull, Trash2 } from "lucide-react";
 
 type Server = {
@@ -208,7 +209,9 @@ export function ServersPanel({ isAdmin }: { isAdmin: boolean }) {
               servers.map((s) => (
                 <tr key={s.uuid} className="border-t border-line">
                   <td className="px-4 py-3">
-                    <div className="font-medium">{s.name}</div>
+                    <Link href={`/servers/${s.uuid}`} className="font-medium hover:text-accent">
+                      {s.name}
+                    </Link>
                     <div className="text-xs text-ink-faint">{s.container_name}</div>
                   </td>
                   <td className="px-4 py-3 text-xs font-medium tracking-wide">{s.status}</td>

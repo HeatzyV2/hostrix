@@ -10,6 +10,7 @@ import (
 
 	"github.com/hostrix/hostrix/api/internal/auth"
 	"github.com/hostrix/hostrix/api/internal/config"
+	"github.com/hostrix/hostrix/api/internal/tickets"
 	"github.com/hostrix/hostrix/api/internal/users"
 	"golang.org/x/time/rate"
 	"gorm.io/gorm"
@@ -19,6 +20,7 @@ type Server struct {
 	cfg        *config.Config
 	db         *gorm.DB
 	auth       *auth.Service
+	tickets    *tickets.Store
 	httpServer *http.Server
 	loginLimit *ipRateLimiter
 }
@@ -28,6 +30,7 @@ func NewServer(cfg *config.Config, db *gorm.DB) *Server {
 		cfg:        cfg,
 		db:         db,
 		auth:       auth.NewService(db, cfg),
+		tickets:    tickets.NewStore(),
 		loginLimit: newIPRateLimiter(rate.Every(time.Minute/10), 10),
 	}
 
@@ -53,14 +56,16 @@ func NewServer(cfg *config.Config, db *gorm.DB) *Server {
 	mux.HandleFunc("POST /api/v1/servers/{id}/stop", s.handleServerPower("stop"))
 	mux.HandleFunc("POST /api/v1/servers/{id}/restart", s.handleServerPower("restart"))
 	mux.HandleFunc("POST /api/v1/servers/{id}/kill", s.handleServerPower("kill"))
+	mux.HandleFunc("GET /api/v1/servers/{id}/metrics", s.handleServerMetrics)
+	mux.HandleFunc("GET /api/v1/servers/{id}/console", s.handleConsoleTicket)
+	mux.HandleFunc("GET /api/v1/servers/{id}/console/ws", s.handleConsoleWS)
 
 	s.httpServer = &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           s.withMiddleware(mux),
 		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      10 * time.Minute,
-		IdleTimeout:       60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		// ReadTimeout/WriteTimeout left unset (0) so WebSocket consoles stay alive.
 	}
 	return s
 }
@@ -110,7 +115,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, code, map[string]any{
 		"status":  status,
 		"service": "hostrix-api",
-		"version": "0.2.0",
+		"version": "0.3.0",
 	})
 }
 

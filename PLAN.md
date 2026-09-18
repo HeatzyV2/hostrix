@@ -98,11 +98,12 @@ Phase 1 est développable sans Incus. L’API doit démarrer avec MariaDB access
 - [x] Heartbeat Node → API
 - [x] API nodes + servers lifecycle
 - [x] Panel Nodes / Servers UI
-### Phase 3 — Servers UI + Console + Metrics
+### Phase 3 — Servers UI + Console + Metrics *(terminée côté code)*
 
-- CRUD servers UI
-- WebSocket console (stdout/stdin)
-- Métriques réelles Incus (jamais de fausses stats)
+- [x] Servers UI (liste + détail)
+- [x] Console WebSocket (ticket → API → Agent → Incus exec)
+- [x] Métriques réelles Incus (CPU delta, RAM, disk, network)
+- [x] Dashboard alimenté par heartbeats Nodes (pas de fausses stats)
 
 ### Phase 4 — Files manager
 

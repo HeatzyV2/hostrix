@@ -38,16 +38,16 @@ func New(cfg *config.Config, mgr containers.ContainerManager) *Server {
 	mux.HandleFunc("POST /v1/containers/{name}/kill", s.auth(s.handleKill))
 	mux.HandleFunc("GET /v1/containers/{name}/status", s.auth(s.handleStatus))
 	mux.HandleFunc("GET /v1/containers/{name}/stats", s.auth(s.handleStats))
+	mux.HandleFunc("GET /v1/containers/{name}/console/ws", s.auth(s.handleConsoleWS))
 	mux.HandleFunc("GET /v1/metrics/host", s.auth(s.handleHostMetrics))
 
 	s.http = &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       60 * time.Second,
-		WriteTimeout:      10 * time.Minute,
-		IdleTimeout:       60 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
+	s.applyLongLivedTimeouts()
 	return s
 }
 
@@ -80,7 +80,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{
 		"status":  "ok",
 		"service": "hostrix-agent",
-		"version": "0.2.0",
+		"version": "0.3.0",
 	})
 }
 
@@ -184,6 +184,9 @@ func bearerToken(r *http.Request) string {
 	h := r.Header.Get("Authorization")
 	if strings.HasPrefix(strings.ToLower(h), "bearer ") {
 		return strings.TrimSpace(h[7:])
+	}
+	if t := strings.TrimSpace(r.URL.Query().Get("token")); t != "" {
+		return t
 	}
 	return ""
 }

@@ -171,6 +171,10 @@ func (m *Manager) GetContainerStatus(ctx context.Context, name string) (containe
 	}
 }
 
+func (m *Manager) Connect() (incus.InstanceServer, error) {
+	return m.connect()
+}
+
 func (m *Manager) GetContainerStats(ctx context.Context, name string) (*containers.Stats, error) {
 	if err := containers.ValidateContainerName(name); err != nil {
 		return nil, err
@@ -179,16 +183,43 @@ func (m *Manager) GetContainerStats(ctx context.Context, name string) (*containe
 	if err != nil {
 		return nil, err
 	}
-	state, _, err := srv.GetInstanceState(name)
+
+	s1, _, err := srv.GetInstanceState(name)
 	if err != nil {
 		return nil, err
 	}
-	stats := &containers.Stats{
-		CPUPercent:       float64(state.CPU.Usage) / 1e9, // rough; Incus reports ns usage
-		MemoryUsageBytes: state.Memory.Usage,
-		MemoryLimitBytes: state.Memory.Total,
+	t1 := time.Now()
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-time.After(250 * time.Millisecond):
 	}
-	for _, nic := range state.Network {
+
+	s2, _, err := srv.GetInstanceState(name)
+	if err != nil {
+		return nil, err
+	}
+	elapsed := time.Since(t1).Seconds()
+	if elapsed <= 0 {
+		elapsed = 0.25
+	}
+
+	cpuDelta := float64(s2.CPU.Usage - s1.CPU.Usage) // nanoseconds
+	cpuPercent := (cpuDelta / 1e9) / elapsed * 100
+	if cpuPercent < 0 {
+		cpuPercent = 0
+	}
+
+	stats := &containers.Stats{
+		CPUPercent:       cpuPercent,
+		MemoryUsageBytes: s2.Memory.Usage,
+		MemoryLimitBytes: s2.Memory.Total,
+	}
+	for _, disk := range s2.Disk {
+		stats.DiskUsageBytes += disk.Usage
+	}
+	for _, nic := range s2.Network {
 		stats.NetworkRxBytes += nic.Counters.BytesReceived
 		stats.NetworkTxBytes += nic.Counters.BytesSent
 	}
