@@ -4,7 +4,7 @@
 
 Hostrix is an open-source, self-hosted hosting panel for managing Linux workloads in LXC containers via [Incus](https://linuxcontainers.org/incus/). It is a modern, simplified alternative to Pterodactyl — without Docker/Wings and without any Hostrix SaaS dependency.
 
-> Status: **Phase 3** — console WebSocket, live Incus metrics, server detail UI.
+> Status: **Phase 6** — backups, advanced server permissions, multi-node polish.
 
 ## One-liner install (Linux)
 
@@ -31,7 +31,7 @@ systemctl enable --now hostrix-agent
 ```
 
 4. Confirm the node shows **ONLINE**, then create a server from `/servers`.
-5. Open a server detail page for live metrics and an interactive console.
+5. Open a server detail page for live metrics, console, backups, and access shares.
 
 For the console WebSocket when the panel and API are on different origins, set:
 
@@ -76,7 +76,7 @@ Explicitly **not** in scope: Kubernetes, Redis, RabbitMQ, NATS, Kafka, PostgreSQ
 hostrix/
 ├── panel/        # Next.js UI
 ├── api/          # Go API
-├── agent/        # Node agent (Phase 2)
+├── agent/        # Node agent
 ├── templates/    # YAML service templates
 ├── installer/    # Linux install / upgrade / systemd
 ├── docker/       # Local MariaDB for development
@@ -84,7 +84,7 @@ hostrix/
 └── PLAN.md       # Full technical plan
 ```
 
-## Development (Phase 1)
+## Development
 
 ### Prerequisites
 
@@ -109,6 +109,14 @@ go test ./...
 go run ./cmd/hostrix-api
 ```
 
+### Agent
+
+```bash
+cd agent
+go test ./...
+go run ./cmd/hostrix-agent
+```
+
 ### Panel
 
 ```bash
@@ -128,14 +136,29 @@ Open http://localhost:3000 — default bootstrap admin is created on first API s
 | GET | `/api/v1/auth/me` | Current user |
 | GET | `/api/v1/health` | Health check |
 
+### Phase 6 endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET/POST | `/api/v1/servers/:id/backups` | List / create backups |
+| GET/DELETE | `/api/v1/servers/:id/backups/:backupId` | Get / delete |
+| POST | `/api/v1/servers/:id/backups/:backupId/restore` | Restore container from backup |
+| GET | `/api/v1/servers/:id/backups/:backupId/download` | Download backup archive |
+| GET | `/api/v1/backups` | All accessible backups |
+| GET/POST | `/api/v1/servers/:id/permissions` | List / grant shares |
+| DELETE | `/api/v1/servers/:id/permissions/:userId` | Revoke share |
+| GET | `/api/v1/users` | Admin user list |
+
+Server list/detail JSON includes `node_uuid`, `node_name`, and `node_status`. Creating a server on an **OFFLINE** node is refused.
+
 ## Phases
 
-1. **Foundations** — API, panel, auth, MariaDB *(current)*
+1. **Foundations** — API, panel, auth, MariaDB
 2. Incus + Agent + container lifecycle
 3. Servers UI, WebSocket console, metrics
 4. File manager
 5. Templates (Minecraft, Node.js, Python, …)
-6. Backups, multi-node, advanced permissions
+6. **Backups, multi-node, advanced permissions** *(current)*
 
 See [PLAN.md](./PLAN.md) for details.
 
@@ -145,6 +168,7 @@ See [PLAN.md](./PLAN.md) for details.
 - Sessions use opaque tokens stored as SHA-256 hashes
 - Login is rate-limited per IP
 - No arbitrary shell execution from user input (validated internal operations only)
+- Server shares enforce `can_start` / `can_stop` / `can_files` / `can_console` on the API
 
 ## License
 

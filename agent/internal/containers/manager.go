@@ -1,6 +1,9 @@
 package containers
 
-import "context"
+import (
+	"context"
+	"io"
+)
 
 // CreateRequest defines validated container creation parameters.
 // Callers must never pass raw user shell input.
@@ -41,6 +44,12 @@ type HostMetrics struct {
 	Containers       int     `json:"containers"`
 }
 
+type BackupInfo struct {
+	Name      string `json:"name"`
+	CreatedAt string `json:"created_at,omitempty"`
+	SizeBytes int64  `json:"size_bytes"`
+}
+
 // ContainerManager abstracts the runtime (Incus today).
 type ContainerManager interface {
 	CreateContainer(ctx context.Context, req CreateRequest) error
@@ -56,4 +65,10 @@ type ContainerManager interface {
 	WriteFile(ctx context.Context, name string, path string, data []byte) error
 	DeleteFile(ctx context.Context, name string, path string) error
 	HostMetrics(ctx context.Context) (*HostMetrics, error)
+	CreateBackup(ctx context.Context, containerName, backupName string) (*BackupInfo, error)
+	ListBackups(ctx context.Context, containerName string) ([]BackupInfo, error)
+	GetBackup(ctx context.Context, containerName, backupName string) (*BackupInfo, error)
+	DeleteBackup(ctx context.Context, containerName, backupName string) error
+	DownloadBackup(ctx context.Context, containerName, backupName string, w io.Writer) (int64, error)
+	RestoreBackup(ctx context.Context, containerName, backupName string) error
 }

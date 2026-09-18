@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Loader2,
@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { ServerConsole } from "@/components/server-console";
 import { ServerMetrics } from "@/components/server-metrics";
-import { useRouter } from "next/navigation";
+import { ServerBackups } from "@/components/server-backups";
+import { ServerPermissions } from "@/components/server-permissions";
 
 type Server = {
   uuid: string;
@@ -24,9 +25,12 @@ type Server = {
   cpu: number;
   disk: number;
   container_name: string;
+  node_uuid?: string;
+  node_name?: string;
+  node_status?: string;
 };
 
-export function ServerDetail() {
+export function ServerDetail({ isAdmin }: { isAdmin: boolean }) {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const router = useRouter();
@@ -108,6 +112,13 @@ export function ServerDetail() {
           <h1 className="font-display text-3xl font-semibold tracking-tight">{server.name}</h1>
           <p className="text-sm text-ink-muted">
             {server.container_name} · <span className="tracking-wide">{server.status}</span>
+            {server.node_name ? (
+              <>
+                {" "}
+                · {server.node_name}{" "}
+                <span className="text-ink-faint">({server.node_status})</span>
+              </>
+            ) : null}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -129,6 +140,8 @@ export function ServerDetail() {
 
       <ServerMetrics serverId={server.uuid} />
       <ServerConsole serverId={server.uuid} />
+      <ServerBackups serverId={server.uuid} />
+      <ServerPermissions serverId={server.uuid} isAdmin={isAdmin} />
     </div>
   );
 }

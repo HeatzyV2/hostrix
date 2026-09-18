@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	ErrNotFound = errors.New("server not found")
+	ErrNotFound  = errors.New("server not found")
 	ErrForbidden = errors.New("forbidden")
 )
 
@@ -29,6 +29,13 @@ type CreateInput struct {
 	CPULimit   int
 	DiskMB     int
 	OwnerID    uint64
+}
+
+type ServerView struct {
+	Server   models.Server
+	NodeUUID string
+	NodeName string
+	NodeStatus string
 }
 
 func Create(ctx context.Context, db *gorm.DB, in CreateInput) (*models.Server, error) {
@@ -50,8 +57,8 @@ func Create(ctx context.Context, db *gorm.DB, in CreateInput) (*models.Server, e
 		}
 		return nil, err
 	}
-	if node.Status != "ONLINE" && node.Status != "INSTALLING" {
-		// Allow INSTALLING for first bring-up; prefer ONLINE.
+	if node.Status == "OFFLINE" {
+		return nil, fmt.Errorf("node is offline")
 	}
 
 	var templateID uint64 = in.TemplateID
@@ -63,7 +70,6 @@ func Create(ctx context.Context, db *gorm.DB, in CreateInput) (*models.Server, e
 				in.Image = tmpl.Image
 			}
 		} else {
-			// create ephemeral template row if missing
 			tmpl = models.ServerTemplate{
 				UUID:           uuid.NewString(),
 				Name:           "Ubuntu",
@@ -122,12 +128,45 @@ func Create(ctx context.Context, db *gorm.DB, in CreateInput) (*models.Server, e
 
 func ListForUser(db *gorm.DB, user *models.User) ([]models.Server, error) {
 	var list []models.Server
-	q := db.Order("id desc")
-	if !user.IsAdmin {
-		q = q.Where("owner_id = ?", user.ID)
+	if user.IsAdmin {
+		err := db.Order("id desc").Find(&list).Error
+		return list, err
 	}
-	err := q.Find(&list).Error
+	ids, err := AccessibleServerIDs(db, user)
+	if err != nil {
+		return nil, err
+	}
+	if len(ids) == 0 {
+		return []models.Server{}, nil
+	}
+	err = db.Where("id IN ?", ids).Order("id desc").Find(&list).Error
 	return list, err
+}
+
+func AccessibleServerIDs(db *gorm.DB, user *models.User) ([]uint64, error) {
+	if user.IsAdmin {
+		var ids []uint64
+		err := db.Model(&models.Server{}).Pluck("id", &ids).Error
+		return ids, err
+	}
+	owned := make([]uint64, 0)
+	if err := db.Model(&models.Server{}).Where("owner_id = ?", user.ID).Pluck("id", &owned).Error; err != nil {
+		return nil, err
+	}
+	shared := make([]uint64, 0)
+	if err := db.Model(&models.ServerPermission{}).Where("user_id = ?", user.ID).Pluck("server_id", &shared).Error; err != nil {
+		return nil, err
+	}
+	seen := map[uint64]struct{}{}
+	out := make([]uint64, 0, len(owned)+len(shared))
+	for _, id := range append(owned, shared...) {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out, nil
 }
 
 func GetByUUID(db *gorm.DB, id string) (*models.Server, error) {
@@ -139,8 +178,91 @@ func GetByUUID(db *gorm.DB, id string) (*models.Server, error) {
 	return &srv, err
 }
 
-func CanAccess(user *models.User, srv *models.Server) bool {
+func GetNode(db *gorm.DB, nodeID uint64) (*models.Node, error) {
+	var node models.Node
+	if err := db.First(&node, nodeID).Error; err != nil {
+		return nil, err
+	}
+	return &node, nil
+}
+
+func WithNodeInfo(db *gorm.DB, list []models.Server) ([]ServerView, error) {
+	out := make([]ServerView, 0, len(list))
+	cache := map[uint64]*models.Node{}
+	for i := range list {
+		n, ok := cache[list[i].NodeID]
+		if !ok {
+			var node models.Node
+			if err := db.First(&node, list[i].NodeID).Error; err != nil {
+				out = append(out, ServerView{Server: list[i]})
+				continue
+			}
+			n = &node
+			cache[list[i].NodeID] = n
+		}
+		out = append(out, ServerView{
+			Server:     list[i],
+			NodeUUID:   n.UUID,
+			NodeName:   n.Name,
+			NodeStatus: n.Status,
+		})
+	}
+	return out, nil
+}
+
+// CanAccess is true for admins, owners, or users with any ServerPermission share.
+func CanAccess(db *gorm.DB, user *models.User, srv *models.Server) bool {
+	if user.IsAdmin || srv.OwnerID == user.ID {
+		return true
+	}
+	var count int64
+	_ = db.Model(&models.ServerPermission{}).
+		Where("server_id = ? AND user_id = ?", srv.ID, user.ID).
+		Count(&count).Error
+	return count > 0
+}
+
+func CanManagePermissions(user *models.User, srv *models.Server) bool {
 	return user.IsAdmin || srv.OwnerID == user.ID
+}
+
+type Action string
+
+const (
+	ActionStart   Action = "start"
+	ActionStop    Action = "stop"
+	ActionRestart Action = "restart"
+	ActionKill    Action = "kill"
+	ActionFiles   Action = "files"
+	ActionConsole Action = "console"
+	ActionMetrics Action = "metrics"
+	ActionBackup  Action = "backup"
+)
+
+func CanPerform(db *gorm.DB, user *models.User, srv *models.Server, action Action) bool {
+	if user.IsAdmin || srv.OwnerID == user.ID {
+		return true
+	}
+	var perm models.ServerPermission
+	err := db.Where("server_id = ? AND user_id = ?", srv.ID, user.ID).First(&perm).Error
+	if err != nil {
+		return false
+	}
+	switch action {
+	case ActionStart:
+		return perm.CanStart
+	case ActionStop, ActionRestart, ActionKill:
+		return perm.CanStop
+	case ActionFiles:
+		return perm.CanFiles
+	case ActionConsole:
+		return perm.CanConsole
+	case ActionMetrics, ActionBackup:
+		// Shared users with any flag can view metrics / manage backups for that server.
+		return perm.CanStart || perm.CanStop || perm.CanFiles || perm.CanConsole
+	default:
+		return false
+	}
 }
 
 func Delete(ctx context.Context, db *gorm.DB, user *models.User, id string) error {
@@ -148,7 +270,7 @@ func Delete(ctx context.Context, db *gorm.DB, user *models.User, id string) erro
 	if err != nil {
 		return err
 	}
-	if !CanAccess(user, srv) {
+	if !CanManagePermissions(user, srv) {
 		return ErrForbidden
 	}
 	var node models.Node
@@ -158,11 +280,12 @@ func Delete(ctx context.Context, db *gorm.DB, user *models.User, id string) erro
 	client := agentclient.New(node.Address, node.Port, node.Token)
 	_ = client.StopContainer(ctx, srv.ContainerName)
 	if err := client.DeleteContainer(ctx, srv.ContainerName); err != nil {
-		// still remove DB row if container already gone
 		if !strings.Contains(strings.ToLower(err.Error()), "not found") {
 			return err
 		}
 	}
+	_ = db.Where("server_id = ?", srv.ID).Delete(&models.ServerPermission{}).Error
+	_ = db.Where("server_id = ?", srv.ID).Delete(&models.Backup{}).Error
 	return db.Delete(srv).Error
 }
 
@@ -171,7 +294,20 @@ func Power(ctx context.Context, db *gorm.DB, user *models.User, id, action strin
 	if err != nil {
 		return err
 	}
-	if !CanAccess(user, srv) {
+	var act Action
+	switch action {
+	case "start":
+		act = ActionStart
+	case "stop":
+		act = ActionStop
+	case "restart":
+		act = ActionRestart
+	case "kill":
+		act = ActionKill
+	default:
+		return fmt.Errorf("invalid action")
+	}
+	if !CanPerform(db, user, srv, act) {
 		return ErrForbidden
 	}
 	var node models.Node
@@ -190,8 +326,6 @@ func Power(ctx context.Context, db *gorm.DB, user *models.User, id, action strin
 		pending = "RESTARTING"
 	case "kill":
 		pending = "STOPPING"
-	default:
-		return fmt.Errorf("invalid action")
 	}
 	_ = db.Model(srv).Update("status", pending).Error
 

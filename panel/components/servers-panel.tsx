@@ -13,6 +13,9 @@ type Server = {
   disk: number;
   container_name: string;
   node_id: number;
+  node_uuid?: string;
+  node_name?: string;
+  node_status?: string;
 };
 
 type Node = {
@@ -191,6 +194,7 @@ export function ServersPanel({ isAdmin }: { isAdmin: boolean }) {
           <thead className="bg-canvas-raised text-ink-muted">
             <tr>
               <th className="px-4 py-3 font-medium">Name</th>
+              <th className="px-4 py-3 font-medium">Node</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">RAM</th>
               <th className="px-4 py-3 font-medium">CPU</th>
@@ -201,7 +205,7 @@ export function ServersPanel({ isAdmin }: { isAdmin: boolean }) {
           <tbody>
             {servers.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-ink-faint">
+                <td colSpan={7} className="px-4 py-8 text-ink-faint">
                   No servers yet.
                 </td>
               </tr>
@@ -213,6 +217,10 @@ export function ServersPanel({ isAdmin }: { isAdmin: boolean }) {
                       {s.name}
                     </Link>
                     <div className="text-xs text-ink-faint">{s.container_name}</div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="text-sm">{s.node_name || "—"}</div>
+                    <div className="text-xs text-ink-faint">{s.node_status || ""}</div>
                   </td>
                   <td className="px-4 py-3 text-xs font-medium tracking-wide">{s.status}</td>
                   <td className="px-4 py-3">{s.memory} MB</td>

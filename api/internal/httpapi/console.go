@@ -27,7 +27,7 @@ func (s *Server) handleConsoleTicket(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	srv, node, ok := s.loadAccessibleServer(w, r, user)
+	srv, node, ok := s.loadAccessibleServer(w, r, user, servers.ActionConsole)
 	if !ok {
 		return
 	}
@@ -118,7 +118,7 @@ func (s *Server) handleServerMetrics(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	srv, node, ok := s.loadAccessibleServer(w, r, user)
+	srv, node, ok := s.loadAccessibleServer(w, r, user, servers.ActionMetrics)
 	if !ok {
 		return
 	}
@@ -137,7 +137,7 @@ func (s *Server) handleServerMetrics(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) loadAccessibleServer(w http.ResponseWriter, r *http.Request, user *models.User) (*models.Server, *models.Node, bool) {
+func (s *Server) loadAccessibleServer(w http.ResponseWriter, r *http.Request, user *models.User, action servers.Action) (*models.Server, *models.Node, bool) {
 	srv, err := servers.GetByUUID(s.db, r.PathValue("id"))
 	if errors.Is(err, servers.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "not found")
@@ -147,7 +147,7 @@ func (s *Server) loadAccessibleServer(w http.ResponseWriter, r *http.Request, us
 		writeError(w, http.StatusInternalServerError, "failed to load server")
 		return nil, nil, false
 	}
-	if !servers.CanAccess(user, srv) {
+	if !servers.CanPerform(s.db, user, srv, action) {
 		writeError(w, http.StatusForbidden, "forbidden")
 		return nil, nil, false
 	}

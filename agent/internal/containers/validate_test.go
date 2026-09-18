@@ -26,6 +26,15 @@ func TestSanitizeContainerPath(t *testing.T) {
 	}
 }
 
+func TestValidateBackupName(t *testing.T) {
+	if err := ValidateBackupName("550e8400-e29b-41d4-a716-446655440000"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateBackupName("../bad"); err == nil {
+		t.Fatal("expected invalid backup name")
+	}
+}
+
 func TestValidateCreateRequest(t *testing.T) {
 	err := ValidateCreateRequest(CreateRequest{
 		Name: "hx-test", Image: "ubuntu/24.04", MemoryMB: 512, CPULimit: 100, DiskMB: 2048,

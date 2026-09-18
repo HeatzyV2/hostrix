@@ -39,6 +39,12 @@ func New(cfg *config.Config, mgr containers.ContainerManager) *Server {
 	mux.HandleFunc("GET /v1/containers/{name}/status", s.auth(s.handleStatus))
 	mux.HandleFunc("GET /v1/containers/{name}/stats", s.auth(s.handleStats))
 	mux.HandleFunc("GET /v1/containers/{name}/console/ws", s.auth(s.handleConsoleWS))
+	mux.HandleFunc("GET /v1/containers/{name}/backups", s.auth(s.handleListBackups))
+	mux.HandleFunc("POST /v1/containers/{name}/backups", s.auth(s.handleCreateBackup))
+	mux.HandleFunc("GET /v1/containers/{name}/backups/{backup}", s.auth(s.handleGetBackup))
+	mux.HandleFunc("DELETE /v1/containers/{name}/backups/{backup}", s.auth(s.handleDeleteBackup))
+	mux.HandleFunc("GET /v1/containers/{name}/backups/{backup}/download", s.auth(s.handleDownloadBackup))
+	mux.HandleFunc("POST /v1/containers/{name}/backups/{backup}/restore", s.auth(s.handleRestoreBackup))
 	mux.HandleFunc("GET /v1/metrics/host", s.auth(s.handleHostMetrics))
 
 	s.http = &http.Server{
@@ -80,7 +86,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{
 		"status":  "ok",
 		"service": "hostrix-agent",
-		"version": "0.3.0",
+		"version": "0.6.0",
 	})
 }
 
