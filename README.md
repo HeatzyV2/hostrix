@@ -9,7 +9,7 @@ Hostrix is an open-source, self-hosted hosting panel for managing Linux workload
 ## One-liner install (Linux)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/HeatzyV2/hostrix/main/installer/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/HeatzyV2/hostrix/main/installer/install.sh | sudo bash
 ```
 
 ## Phase 2 — Agent quick start
@@ -44,10 +44,11 @@ NEXT_PUBLIC_HOSTRIX_API_URL=http://<api-host>:8080
 Non-interactive:
 
 ```bash
-HOSTRIX_NONINTERACTIVE=1 \
-HOSTRIX_DB_PASSWORD='strong-db-pass' \
-HOSTRIX_BOOTSTRAP_ADMIN_PASSWORD='strong-admin-pass' \
-curl -fsSL https://raw.githubusercontent.com/HeatzyV2/hostrix/main/installer/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/HeatzyV2/hostrix/main/installer/install.sh | \
+  sudo env HOSTRIX_NONINTERACTIVE=1 \
+    HOSTRIX_DB_PASSWORD='strong-db-pass' \
+    HOSTRIX_BOOTSTRAP_ADMIN_PASSWORD='strong-admin-pass' \
+    bash
 ```
 
 Supported install targets: Ubuntu / Debian (amd64, arm64).

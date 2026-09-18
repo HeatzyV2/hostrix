@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Hostrix installer — Phase 1 skeleton (Linux only)
+# Hostrix installer (Linux — Ubuntu/Debian)
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/OWNER/hostrix/main/installer/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/HeatzyV2/hostrix/main/installer/install.sh | sudo bash
 # Non-interactive:
-#   HOSTRIX_NONINTERACTIVE=1 curl -fsSL ... | bash
+#   curl -fsSL ... | sudo env HOSTRIX_NONINTERACTIVE=1 HOSTRIX_BOOTSTRAP_ADMIN_PASSWORD='…' bash
 
 set -euo pipefail
 
@@ -14,7 +14,7 @@ HOSTRIX_NONINTERACTIVE="${HOSTRIX_NONINTERACTIVE:-0}"
 HOSTRIX_DB_NAME="${HOSTRIX_DB_NAME:-hostrix}"
 HOSTRIX_DB_USER="${HOSTRIX_DB_USER:-hostrix}"
 HOSTRIX_HTTP_ADDR="${HOSTRIX_HTTP_ADDR:-:8080}"
-HOSTRIX_PANEL_ORIGIN="${HOSTRIX_PANEL_ORIGIN:-http://localhost:3000}"
+HOSTRIX_PANEL_PORT="${HOSTRIX_PANEL_PORT:-3000}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -31,6 +31,18 @@ require_root() {
   fi
 }
 
+# curl|bash has no usable TTY on stdin — force non-interactive or read from /dev/tty
+ensure_prompt_mode() {
+  if [[ ! -t 0 ]]; then
+    if [[ "${HOSTRIX_NONINTERACTIVE}" != "1" ]] && [[ ! -e /dev/tty ]]; then
+      HOSTRIX_NONINTERACTIVE=1
+      log "No TTY detected — switching to non-interactive defaults"
+    elif [[ "${HOSTRIX_NONINTERACTIVE}" != "1" ]]; then
+      log "Running via pipe — prompts will use /dev/tty"
+    fi
+  fi
+}
+
 detect_os() {
   if [[ ! -f /etc/os-release ]]; then
     die "Unsupported OS: /etc/os-release missing"
@@ -39,8 +51,9 @@ detect_os() {
   source /etc/os-release
   OS_ID="${ID:-unknown}"
   OS_VERSION="${VERSION_ID:-unknown}"
+  OS_CODENAME="${VERSION_CODENAME:-}"
   case "${OS_ID}" in
-    ubuntu|debian|linuxmint) ;;
+    ubuntu|debian) ;;
     *) die "Unsupported distribution: ${OS_ID}. Supported: Ubuntu/Debian." ;;
   esac
   log "Detected ${PRETTY_NAME:-$OS_ID $OS_VERSION}"
@@ -64,11 +77,29 @@ prompt() {
   fi
   local input
   if [[ -n "${default}" ]]; then
-    read -r -p "${msg} [${default}]: " input || true
+    if [[ -e /dev/tty ]]; then
+      read -r -p "${msg} [${default}]: " input </dev/tty || true
+    else
+      read -r -p "${msg} [${default}]: " input || true
+    fi
     printf -v "${var}" '%s' "${input:-$default}"
   else
-    read -r -p "${msg}: " input
+    if [[ -e /dev/tty ]]; then
+      read -r -p "${msg}: " input </dev/tty
+    else
+      read -r -p "${msg}: " input
+    fi
     printf -v "${var}" '%s' "${input}"
+  fi
+}
+
+go_bin() {
+  if [[ -x /usr/local/go/bin/go ]]; then
+    echo /usr/local/go/bin/go
+  elif command -v go >/dev/null 2>&1; then
+    command -v go
+  else
+    die "Go toolchain not found after install"
   fi
 }
 
@@ -77,9 +108,9 @@ install_packages() {
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -y
   apt-get install -y curl ca-certificates gnupg lsb-release git build-essential \
-    mariadb-server mariadb-client
+    openssl mariadb-server mariadb-client
 
-  if ! command -v go >/dev/null 2>&1; then
+  if ! command -v go >/dev/null 2>&1 && [[ ! -x /usr/local/go/bin/go ]]; then
     log "Installing Go toolchain..."
     local go_ver="1.24.2"
     curl -fsSL "https://go.dev/dl/go${go_ver}.linux-${ARCH}.tar.gz" -o /tmp/go.tgz
@@ -114,6 +145,10 @@ setup_mariadb() {
   if [[ -z "${HOSTRIX_ADMIN_PASSWORD:-}" ]]; then
     HOSTRIX_ADMIN_PASSWORD="changeme"
   fi
+  if [[ "${HOSTRIX_ADMIN_PASSWORD}" == "changeme" ]]; then
+    log "WARNING: using default admin password 'changeme' — change it after login"
+  fi
+
   prompt HOSTRIX_DB_PASSWORD_INPUT "MariaDB password for user ${HOSTRIX_DB_USER}" "${db_pass}"
   HOSTRIX_DB_PASSWORD="${HOSTRIX_DB_PASSWORD_INPUT}"
 
@@ -127,67 +162,77 @@ setup_mariadb() {
 install_incus() {
   if command -v incus >/dev/null 2>&1; then
     ok "Incus already installed"
-    return
-  fi
-  log "Installing Incus..."
-  # Official Zabbly packages are preferred on Ubuntu; fall back to message if unavailable.
-  if [[ "${OS_ID}" == "ubuntu" || "${OS_ID}" == "debian" ]]; then
-    apt-get install -y curl gnupg
+  else
+    log "Installing Incus (Zabbly)..."
     mkdir -p /etc/apt/keyrings
-    if curl -fsSL https://pkgs.zabbly.com/key.asc -o /etc/apt/keyrings/zabbly.asc 2>/dev/null; then
-      echo "deb [signed-by=/etc/apt/keyrings/zabbly.asc] https://pkgs.zabbly.com/incus/stable $(. /etc/os-release && echo ${VERSION_CODENAME}) main" \
-        >/etc/apt/sources.list.d/zabbly-incus-stable.list
-      apt-get update -y
-      apt-get install -y incus
-    else
-      log "Could not reach Zabbly Incus packages. Install Incus manually, then re-run."
-      return
+    if ! curl -fsSL https://pkgs.zabbly.com/key.asc -o /etc/apt/keyrings/zabbly.asc; then
+      die "Failed to download Zabbly Incus signing key. Install Incus manually, then re-run."
     fi
-  fi
-  if command -v incus >/dev/null 2>&1; then
-    # Minimal init for fresh installs (non-interactive best-effort)
-    if ! incus info >/dev/null 2>&1; then
-      log "Initializing Incus (minimal)..."
-      incus admin init --auto || true
+    if [[ -z "${OS_CODENAME}" ]]; then
+      die "Could not detect VERSION_CODENAME for Incus apt repo"
     fi
-    ok "Incus ready"
+    echo "deb [signed-by=/etc/apt/keyrings/zabbly.asc] https://pkgs.zabbly.com/incus/stable ${OS_CODENAME} main" \
+      >/etc/apt/sources.list.d/zabbly-incus-stable.list
+    apt-get update -y
+    apt-get install -y incus
   fi
+
+  if ! command -v incus >/dev/null 2>&1; then
+    die "Incus installation failed"
+  fi
+
+  if ! incus info >/dev/null 2>&1; then
+    log "Initializing Incus (auto)..."
+    incus admin init --auto || die "incus admin init failed"
+  fi
+  ok "Incus ready"
 }
 
 fetch_source() {
   log "Fetching Hostrix (${HOSTRIX_VERSION})..."
-  mkdir -p "${HOSTRIX_INSTALL_DIR}"
+  mkdir -p "$(dirname "${HOSTRIX_INSTALL_DIR}")"
   if [[ -d "${HOSTRIX_INSTALL_DIR}/.git" ]]; then
     git -C "${HOSTRIX_INSTALL_DIR}" fetch --depth 1 origin "${HOSTRIX_VERSION}"
     git -C "${HOSTRIX_INSTALL_DIR}" checkout -f "FETCH_HEAD"
   else
     rm -rf "${HOSTRIX_INSTALL_DIR}"
-    git clone --depth 1 --branch "${HOSTRIX_VERSION}" \
-      "https://github.com/${HOSTRIX_REPO}.git" "${HOSTRIX_INSTALL_DIR}" \
-      || git clone --depth 1 "https://github.com/${HOSTRIX_REPO}.git" "${HOSTRIX_INSTALL_DIR}"
+    if ! git clone --depth 1 --branch "${HOSTRIX_VERSION}" \
+      "https://github.com/${HOSTRIX_REPO}.git" "${HOSTRIX_INSTALL_DIR}"; then
+      git clone --depth 1 "https://github.com/${HOSTRIX_REPO}.git" "${HOSTRIX_INSTALL_DIR}"
+    fi
   fi
 }
 
 build_hostrix() {
+  local go
+  go="$(go_bin)"
+  mkdir -p "${HOSTRIX_INSTALL_DIR}/bin"
+
   log "Building API..."
-  cd "${HOSTRIX_INSTALL_DIR}/api"
-  /usr/local/go/bin/go build -o "${HOSTRIX_INSTALL_DIR}/bin/hostrix-api" ./cmd/hostrix-api
+  (cd "${HOSTRIX_INSTALL_DIR}/api" && "${go}" build -o "${HOSTRIX_INSTALL_DIR}/bin/hostrix-api" ./cmd/hostrix-api)
 
   log "Building Agent..."
-  cd "${HOSTRIX_INSTALL_DIR}/agent"
-  /usr/local/go/bin/go build -o "${HOSTRIX_INSTALL_DIR}/bin/hostrix-agent" ./cmd/hostrix-agent
+  (cd "${HOSTRIX_INSTALL_DIR}/agent" && "${go}" build -o "${HOSTRIX_INSTALL_DIR}/bin/hostrix-agent" ./cmd/hostrix-agent)
 
   log "Building Panel..."
-  cd "${HOSTRIX_INSTALL_DIR}/panel"
-  npm ci || npm install
-  npm run build
+  (cd "${HOSTRIX_INSTALL_DIR}/panel" && { npm ci || npm install; } && npm run build)
+}
+
+detect_public_ip() {
+  local ip
+  ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  echo "${ip:-127.0.0.1}"
 }
 
 write_env() {
+  local ip panel_origin
+  ip="$(detect_public_ip)"
+  panel_origin="${HOSTRIX_PANEL_ORIGIN:-http://${ip}:${HOSTRIX_PANEL_PORT}}"
+
   mkdir -p /etc/hostrix
   cat >/etc/hostrix/hostrix.env <<EOF
 HOSTRIX_HTTP_ADDR=${HOSTRIX_HTTP_ADDR}
-HOSTRIX_PANEL_ORIGIN=${HOSTRIX_PANEL_ORIGIN}
+HOSTRIX_PANEL_ORIGIN=${panel_origin}
 HOSTRIX_DB_HOST=127.0.0.1
 HOSTRIX_DB_PORT=3306
 HOSTRIX_DB_USER=${HOSTRIX_DB_USER}
@@ -197,14 +242,25 @@ HOSTRIX_BOOTSTRAP_ADMIN_USERNAME=admin
 HOSTRIX_BOOTSTRAP_ADMIN_EMAIL=admin@localhost
 HOSTRIX_BOOTSTRAP_ADMIN_PASSWORD=${HOSTRIX_ADMIN_PASSWORD}
 HOSTRIX_COOKIE_SECURE=false
+HOSTRIX_TEMPLATES_DIR=${HOSTRIX_INSTALL_DIR}/templates
 EOF
   chmod 600 /etc/hostrix/hostrix.env
+
+  mkdir -p /etc/systemd/system/hostrix-panel.service.d
+  cat >/etc/systemd/system/hostrix-panel.service.d/override.conf <<EOF
+[Service]
+Environment=HOSTRIX_API_URL=http://127.0.0.1:8080
+Environment=HOSTRIX_API_INTERNAL_URL=http://127.0.0.1:8080
+Environment=NEXT_PUBLIC_HOSTRIX_API_URL=http://${ip}:8080
+Environment=PORT=${HOSTRIX_PANEL_PORT}
+EOF
 }
 
 install_systemd() {
   log "Installing systemd units..."
   cp "${HOSTRIX_INSTALL_DIR}/installer/systemd/hostrix-api.service" /etc/systemd/system/
   cp "${HOSTRIX_INSTALL_DIR}/installer/systemd/hostrix-panel.service" /etc/systemd/system/
+  cp "${HOSTRIX_INSTALL_DIR}/installer/systemd/hostrix-agent.service" /etc/systemd/system/
   systemctl daemon-reload
   systemctl enable --now hostrix-api
   systemctl enable --now hostrix-panel
@@ -212,27 +268,31 @@ install_systemd() {
 
 print_summary() {
   local ip
-  ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  ip="$(detect_public_ip)"
   echo
-  ok "Hostrix Phase 1 installed."
-  echo "  Panel     : http://${ip:-127.0.0.1}:3000"
-  echo "  API       : http://${ip:-127.0.0.1}:8080"
+  ok "Hostrix installed."
+  echo "  Panel     : http://${ip}:${HOSTRIX_PANEL_PORT}"
+  echo "  API       : http://${ip}:8080"
   echo "  Admin     : admin / ${HOSTRIX_ADMIN_PASSWORD}"
   echo "  Config    : /etc/hostrix/hostrix.env"
   echo "  Install   : ${HOSTRIX_INSTALL_DIR}"
   echo
-  echo "Note: Create a Node in the panel, then configure /etc/hostrix/agent.env and start hostrix-agent."
+  echo "Next (mono-node):"
+  echo "  1. Open the panel and create a Node (address 127.0.0.1, port 8081)"
+  echo "  2. Save the one-time token to /etc/hostrix/agent.env — see .env.agent.example"
+  echo "  3. systemctl enable --now hostrix-agent"
+  echo
 }
 
 main() {
   require_root
+  ensure_prompt_mode
   detect_os
   detect_arch
   install_packages
   setup_mariadb
   install_incus
   fetch_source
-  mkdir -p "${HOSTRIX_INSTALL_DIR}/bin"
   write_env
   build_hostrix
   install_systemd
