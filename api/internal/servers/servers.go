@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hostrix/hostrix/api/internal/agentclient"
 	"github.com/hostrix/hostrix/api/internal/models"
+	tpl "github.com/hostrix/hostrix/api/internal/templates"
 	"gorm.io/gorm"
 )
 
@@ -21,14 +22,16 @@ var (
 var nameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9 _.-]{1,62}$`)
 
 type CreateInput struct {
-	Name       string
-	NodeUUID   string
-	TemplateID uint64 // optional for phase 2; 0 uses default image
-	Image      string
-	MemoryMB   int
-	CPULimit   int
-	DiskMB     int
-	OwnerID    uint64
+	Name         string
+	NodeUUID     string
+	TemplateID   uint64 // legacy numeric id
+	TemplateUUID string
+	TemplateSlug string
+	Image        string
+	MemoryMB     int
+	CPULimit     int
+	DiskMB       int
+	OwnerID      uint64
 }
 
 type ServerView struct {
@@ -43,11 +46,17 @@ func Create(ctx context.Context, db *gorm.DB, in CreateInput) (*models.Server, e
 	if !nameRe.MatchString(in.Name) {
 		return nil, fmt.Errorf("invalid server name")
 	}
+	if in.MemoryMB <= 0 {
+		in.MemoryMB = 1024
+	}
+	if in.CPULimit <= 0 {
+		in.CPULimit = 100
+	}
+	if in.DiskMB <= 0 {
+		in.DiskMB = 10240
+	}
 	if in.MemoryMB < 64 || in.CPULimit < 10 || in.DiskMB < 1024 {
 		return nil, fmt.Errorf("invalid resource limits")
-	}
-	if in.Image == "" {
-		in.Image = "ubuntu/24.04"
 	}
 
 	var node models.Node
@@ -61,16 +70,30 @@ func Create(ctx context.Context, db *gorm.DB, in CreateInput) (*models.Server, e
 		return nil, fmt.Errorf("node is offline")
 	}
 
-	var templateID uint64 = in.TemplateID
-	if templateID == 0 {
-		var tmpl models.ServerTemplate
-		if err := db.Where("slug = ?", "ubuntu").First(&tmpl).Error; err == nil {
-			templateID = tmpl.ID
-			if in.Image == "ubuntu/24.04" && tmpl.Image != "" {
-				in.Image = tmpl.Image
+	tmpl, err := tpl.ResolveRef(db, in.TemplateID, in.TemplateUUID, in.TemplateSlug)
+	if err != nil {
+		if errors.Is(err, tpl.ErrNotFound) {
+			return nil, fmt.Errorf("template not found")
+		}
+		return nil, err
+	}
+
+	var templateID uint64
+	if tmpl != nil {
+		templateID = tmpl.ID
+		if in.Image == "" && tmpl.Image != "" {
+			in.Image = tmpl.Image
+		}
+	} else {
+		var fallback models.ServerTemplate
+		err := db.Where("slug = ?", "ubuntu").First(&fallback).Error
+		if err == nil {
+			templateID = fallback.ID
+			if in.Image == "" {
+				in.Image = fallback.Image
 			}
-		} else {
-			tmpl = models.ServerTemplate{
+		} else if errors.Is(err, gorm.ErrRecordNotFound) {
+			fallback = models.ServerTemplate{
 				UUID:           uuid.NewString(),
 				Name:           "Ubuntu",
 				Slug:           "ubuntu",
@@ -78,11 +101,20 @@ func Create(ctx context.Context, db *gorm.DB, in CreateInput) (*models.Server, e
 				Image:          "ubuntu/24.04",
 				StartupCommand: "",
 			}
-			if err := db.Create(&tmpl).Error; err != nil {
+			if err := db.Create(&fallback).Error; err != nil {
 				return nil, err
 			}
-			templateID = tmpl.ID
+			templateID = fallback.ID
+			if in.Image == "" {
+				in.Image = fallback.Image
+			}
+		} else {
+			return nil, err
 		}
+	}
+
+	if in.Image == "" {
+		in.Image = "ubuntu/24.04"
 	}
 
 	serverUUID := uuid.NewString()
@@ -105,7 +137,7 @@ func Create(ctx context.Context, db *gorm.DB, in CreateInput) (*models.Server, e
 	}
 
 	client := agentclient.New(node.Address, node.Port, node.Token)
-	err := client.CreateContainer(ctx, agentclient.CreateContainerRequest{
+	err = client.CreateContainer(ctx, agentclient.CreateContainerRequest{
 		Name:     containerName,
 		Image:    in.Image,
 		MemoryMB: in.MemoryMB,

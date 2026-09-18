@@ -29,6 +29,10 @@ func main() {
 		log.Fatalf("migrate: %v", err)
 	}
 
+	if err := database.SeedTemplates(db, cfg.TemplatesDir); err != nil {
+		log.Fatalf("seed templates: %v", err)
+	}
+
 	if err := users.EnsureBootstrapAdmin(db, cfg); err != nil {
 		log.Fatalf("bootstrap admin: %v", err)
 	}

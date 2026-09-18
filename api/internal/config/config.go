@@ -23,6 +23,8 @@ type Config struct {
 	CookieSecure bool
 	CookieName   string
 
+	TemplatesDir string
+
 	BootstrapAdminUsername string
 	BootstrapAdminEmail    string
 	BootstrapAdminPassword string
@@ -41,6 +43,7 @@ func Load() (*Config, error) {
 		BcryptCost:             getEnvInt("HOSTRIX_BCRYPT_COST", 12),
 		CookieSecure:           getEnvBool("HOSTRIX_COOKIE_SECURE", false),
 		CookieName:             getEnv("HOSTRIX_COOKIE_NAME", "hostrix_session"),
+		TemplatesDir:           getEnv("HOSTRIX_TEMPLATES_DIR", ""),
 		BootstrapAdminUsername: getEnv("HOSTRIX_BOOTSTRAP_ADMIN_USERNAME", "admin"),
 		BootstrapAdminEmail:    getEnv("HOSTRIX_BOOTSTRAP_ADMIN_EMAIL", "admin@localhost"),
 		BootstrapAdminPassword: getEnv("HOSTRIX_BOOTSTRAP_ADMIN_PASSWORD", "changeme"),

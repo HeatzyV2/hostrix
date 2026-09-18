@@ -14,13 +14,15 @@ import (
 )
 
 type createServerRequest struct {
-	Name       string `json:"name"`
-	NodeUUID   string `json:"node_uuid"`
-	TemplateID uint64 `json:"template_id"`
-	Image      string `json:"image"`
-	MemoryMB   int    `json:"memory"`
-	CPULimit   int    `json:"cpu"`
-	DiskMB     int    `json:"disk"`
+	Name         string `json:"name"`
+	NodeUUID     string `json:"node_uuid"`
+	TemplateID   uint64 `json:"template_id"`
+	TemplateUUID string `json:"template_uuid"`
+	TemplateSlug string `json:"template_slug"`
+	Image        string `json:"image"`
+	MemoryMB     int    `json:"memory"`
+	CPULimit     int    `json:"cpu"`
+	DiskMB       int    `json:"disk"`
 }
 
 func (s *Server) handleListServers(w http.ResponseWriter, r *http.Request) {
@@ -62,14 +64,16 @@ func (s *Server) handleCreateServer(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Minute)
 	defer cancel()
 	srv, err := servers.Create(ctx, s.db, servers.CreateInput{
-		Name:       req.Name,
-		NodeUUID:   req.NodeUUID,
-		TemplateID: req.TemplateID,
-		Image:      req.Image,
-		MemoryMB:   req.MemoryMB,
-		CPULimit:   req.CPULimit,
-		DiskMB:     req.DiskMB,
-		OwnerID:    user.ID,
+		Name:         req.Name,
+		NodeUUID:     req.NodeUUID,
+		TemplateID:   req.TemplateID,
+		TemplateUUID: req.TemplateUUID,
+		TemplateSlug: req.TemplateSlug,
+		Image:        req.Image,
+		MemoryMB:     req.MemoryMB,
+		CPULimit:     req.CPULimit,
+		DiskMB:       req.DiskMB,
+		OwnerID:      user.ID,
 	})
 	if err != nil {
 		if srv != nil {

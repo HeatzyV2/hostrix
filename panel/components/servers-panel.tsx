@@ -24,19 +24,27 @@ type Node = {
   status: string;
 };
 
+type Template = {
+  uuid: string;
+  name: string;
+  slug: string;
+  image: string;
+};
+
 export function ServersPanel({ isAdmin }: { isAdmin: boolean }) {
   const [servers, setServers] = useState<Server[]>([]);
   const [nodes, setNodes] = useState<Node[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     node_uuid: "",
+    template_uuid: "",
     memory: 1024,
     cpu: 100,
     disk: 10240,
-    image: "ubuntu/24.04",
   });
 
   const load = useCallback(async () => {
@@ -50,12 +58,24 @@ export function ServersPanel({ isAdmin }: { isAdmin: boolean }) {
     }
     setServers(data.servers || []);
     if (isAdmin) {
-      const nr = await fetch("/api/v1/nodes", { credentials: "include" });
+      const [nr, tr] = await Promise.all([
+        fetch("/api/v1/nodes", { credentials: "include" }),
+        fetch("/api/v1/templates", { credentials: "include" }),
+      ]);
       const nd = await nr.json().catch(() => ({}));
+      const td = await tr.json().catch(() => ({}));
       if (nr.ok) {
         const list = nd.nodes || [];
         setNodes(list);
         setForm((f) => (f.node_uuid || !list[0]?.uuid ? f : { ...f, node_uuid: list[0].uuid }));
+      }
+      if (tr.ok) {
+        const list: Template[] = td.templates || [];
+        setTemplates(list);
+        setForm((f) => {
+          if (f.template_uuid || !list[0]?.uuid) return f;
+          return { ...f, template_uuid: list[0].uuid };
+        });
       }
     }
     setLoading(false);
@@ -135,7 +155,7 @@ export function ServersPanel({ isAdmin }: { isAdmin: boolean }) {
       {isAdmin ? (
         <form
           onSubmit={onCreate}
-          className="grid gap-3 rounded-2xl border border-line bg-canvas-raised/60 p-5 lg:grid-cols-6"
+          className="grid gap-3 rounded-2xl border border-line bg-canvas-raised/60 p-5 lg:grid-cols-7"
         >
           <input
             required
@@ -154,6 +174,19 @@ export function ServersPanel({ isAdmin }: { isAdmin: boolean }) {
             {nodes.map((n) => (
               <option key={n.uuid} value={n.uuid}>
                 {n.name} ({n.status})
+              </option>
+            ))}
+          </select>
+          <select
+            required
+            value={form.template_uuid}
+            onChange={(e) => setForm({ ...form, template_uuid: e.target.value })}
+            className="rounded-lg border border-line bg-canvas-overlay px-3 py-2 text-sm outline-none focus:border-accent/60"
+          >
+            <option value="">Select template</option>
+            {templates.map((t) => (
+              <option key={t.uuid} value={t.uuid}>
+                {t.name}
               </option>
             ))}
           </select>

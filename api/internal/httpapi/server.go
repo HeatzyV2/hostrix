@@ -83,6 +83,12 @@ func NewServer(cfg *config.Config, db *gorm.DB) *Server {
 	mux.HandleFunc("GET /api/v1/backups", s.handleListAllBackups)
 	mux.HandleFunc("GET /api/v1/users", s.handleListUsers)
 
+	mux.HandleFunc("GET /api/v1/templates", s.handleListTemplates)
+	mux.HandleFunc("GET /api/v1/templates/{id}", s.handleGetTemplate)
+	mux.HandleFunc("POST /api/v1/templates", s.handleCreateTemplate)
+	mux.HandleFunc("PUT /api/v1/templates/{id}", s.handleUpdateTemplate)
+	mux.HandleFunc("DELETE /api/v1/templates/{id}", s.handleDeleteTemplate)
+
 	s.httpServer = &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           s.withMiddleware(mux),

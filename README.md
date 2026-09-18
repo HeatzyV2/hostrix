@@ -4,7 +4,7 @@
 
 Hostrix is an open-source, self-hosted hosting panel for managing Linux workloads in LXC containers via [Incus](https://linuxcontainers.org/incus/). It is a modern, simplified alternative to Pterodactyl — without Docker/Wings and without any Hostrix SaaS dependency.
 
-> Status: **Phase 6** — backups, permissions, file manager, multi-node polish (Phase 5 templates pending merge).
+> Status: **Phases 1–6 complete** — panel, Incus agent, console, files, templates, backups, permissions.
 
 ## One-liner install (Linux)
 
@@ -30,8 +30,10 @@ HOSTRIX_NODE_TOKEN=<token>
 systemctl enable --now hostrix-agent
 ```
 
-4. Confirm the node shows **ONLINE**, then create a server from `/servers`.
+4. Confirm the node shows **ONLINE**, then create a server from `/servers` (pick a template).
 5. Open a server detail page for live metrics, console, file manager, backups, and access shares.
+
+Templates under `templates/*/template.yaml` are upserted into MariaDB on API start (`HOSTRIX_TEMPLATES_DIR`, default `../templates` or `/opt/hostrix/templates`). Browse them in the panel at `/templates`.
 
 For the console WebSocket when the panel and API are on different origins, set:
 
@@ -156,9 +158,9 @@ Server list/detail JSON includes `node_uuid`, `node_name`, and `node_status`. Cr
 1. **Foundations** — API, panel, auth, MariaDB
 2. Incus + Agent + container lifecycle
 3. Servers UI, WebSocket console, metrics
-4. File manager *(current)*
-5. Templates (Minecraft, Node.js, Python, …)
-6. **Backups, multi-node, advanced permissions** *(current)*
+4. File manager
+5. Templates — YAML stacks, API CRUD, server create
+6. Backups, multi-node, advanced permissions
 
 See [PLAN.md](./PLAN.md) for details.
 

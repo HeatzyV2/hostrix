@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/hostrix/hostrix/api/internal/config"
 	"github.com/hostrix/hostrix/api/internal/models"
+	"github.com/hostrix/hostrix/api/internal/templates"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -49,23 +49,11 @@ func Migrate(db *gorm.DB) error {
 	); err != nil {
 		return err
 	}
-	return seedTemplates(db)
+	return nil
 }
 
-func seedTemplates(db *gorm.DB) error {
-	var count int64
-	if err := db.Model(&models.ServerTemplate{}).Where("slug = ?", "ubuntu").Count(&count).Error; err != nil {
-		return err
-	}
-	if count > 0 {
-		return nil
-	}
-	return db.Create(&models.ServerTemplate{
-		UUID:           uuid.NewString(),
-		Name:           "Ubuntu",
-		Slug:           "ubuntu",
-		Description:    "Base Ubuntu 24.04 container (Phase 2)",
-		Image:          "ubuntu/24.04",
-		StartupCommand: "",
-	}).Error
+// SeedTemplates syncs YAML definitions from disk into MariaDB.
+func SeedTemplates(db *gorm.DB, templatesDir string) error {
+	_, err := templates.SyncFromDisk(db, templatesDir)
+	return err
 }
