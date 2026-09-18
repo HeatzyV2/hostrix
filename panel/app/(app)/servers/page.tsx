@@ -1,23 +1,17 @@
-function Placeholder({
-  title,
-  body,
-}: {
-  title: string;
-  body: string;
-}) {
-  return (
-    <div className="mx-auto max-w-5xl space-y-3 animate-fade-up">
-      <h1 className="font-display text-3xl font-semibold tracking-tight">{title}</h1>
-      <p className="text-ink-muted">{body}</p>
-    </div>
-  );
-}
+import { ServersPanel } from "@/components/servers-panel";
+import { getMe } from "@/lib/auth";
 
-export default function ServersPage() {
+export default async function ServersPage() {
+  const me = await getMe();
   return (
-    <Placeholder
-      title="Servers"
-      body="Server lifecycle management lands in Phase 2–3 (Incus + UI)."
-    />
+    <div className="mx-auto max-w-6xl space-y-6 animate-fade-up">
+      <header className="space-y-2">
+        <h1 className="font-display text-3xl font-semibold tracking-tight">Servers</h1>
+        <p className="text-ink-muted">
+          Create and control LXC containers through Hostrix Agents.
+        </p>
+      </header>
+      <ServersPanel isAdmin={!!me?.is_admin} />
+    </div>
   );
 }

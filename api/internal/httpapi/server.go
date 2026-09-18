@@ -1,10 +1,8 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"errors"
 	"log"
-	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -12,18 +10,17 @@ import (
 
 	"github.com/hostrix/hostrix/api/internal/auth"
 	"github.com/hostrix/hostrix/api/internal/config"
-	"github.com/hostrix/hostrix/api/internal/models"
 	"github.com/hostrix/hostrix/api/internal/users"
 	"golang.org/x/time/rate"
 	"gorm.io/gorm"
 )
 
 type Server struct {
-	cfg         *config.Config
-	db          *gorm.DB
-	auth        *auth.Service
-	httpServer  *http.Server
-	loginLimit  *ipRateLimiter
+	cfg        *config.Config
+	db         *gorm.DB
+	auth       *auth.Service
+	httpServer *http.Server
+	loginLimit *ipRateLimiter
 }
 
 func NewServer(cfg *config.Config, db *gorm.DB) *Server {
@@ -36,16 +33,33 @@ func NewServer(cfg *config.Config, db *gorm.DB) *Server {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", s.handleHealth)
+
 	mux.HandleFunc("POST /api/v1/auth/login", s.handleLogin)
 	mux.HandleFunc("POST /api/v1/auth/logout", s.handleLogout)
 	mux.HandleFunc("GET /api/v1/auth/me", s.handleMe)
+
+	mux.HandleFunc("GET /api/v1/nodes", s.handleListNodes)
+	mux.HandleFunc("POST /api/v1/nodes", s.handleCreateNode)
+	mux.HandleFunc("GET /api/v1/nodes/{id}", s.handleGetNode)
+	mux.HandleFunc("DELETE /api/v1/nodes/{id}", s.handleDeleteNode)
+	mux.HandleFunc("POST /api/v1/nodes/{id}/token", s.handleRotateNodeToken)
+	mux.HandleFunc("POST /api/v1/nodes/{id}/heartbeat", s.handleNodeHeartbeat)
+
+	mux.HandleFunc("GET /api/v1/servers", s.handleListServers)
+	mux.HandleFunc("POST /api/v1/servers", s.handleCreateServer)
+	mux.HandleFunc("GET /api/v1/servers/{id}", s.handleGetServer)
+	mux.HandleFunc("DELETE /api/v1/servers/{id}", s.handleDeleteServer)
+	mux.HandleFunc("POST /api/v1/servers/{id}/start", s.handleServerPower("start"))
+	mux.HandleFunc("POST /api/v1/servers/{id}/stop", s.handleServerPower("stop"))
+	mux.HandleFunc("POST /api/v1/servers/{id}/restart", s.handleServerPower("restart"))
+	mux.HandleFunc("POST /api/v1/servers/{id}/kill", s.handleServerPower("kill"))
 
 	s.httpServer = &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           s.withMiddleware(mux),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      30 * time.Second,
+		WriteTimeout:      10 * time.Minute,
 		IdleTimeout:       60 * time.Second,
 	}
 	return s
@@ -96,7 +110,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, code, map[string]any{
 		"status":  status,
 		"service": "hostrix-api",
-		"version": "0.1.0",
+		"version": "0.2.0",
 	})
 }
 
@@ -152,50 +166,11 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
-	user, err := s.auth.Authenticate(r)
-	if errors.Is(err, auth.ErrUnauthorized) {
-		writeError(w, http.StatusUnauthorized, "unauthorized")
-		return
-	}
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "auth failed")
+	user, ok := s.requireUser(w, r)
+	if !ok {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"user": publicUser(user)})
-}
-
-func publicUser(u *models.User) map[string]any {
-	return map[string]any{
-		"uuid":     u.UUID,
-		"username": u.Username,
-		"email":    u.Email,
-		"is_admin": u.IsAdmin,
-	}
-}
-
-func decodeJSON(r *http.Request, dst any) error {
-	defer r.Body.Close()
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-	return dec.Decode(dst)
-}
-
-func writeJSON(w http.ResponseWriter, code int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(v)
-}
-
-func writeError(w http.ResponseWriter, code int, msg string) {
-	writeJSON(w, code, map[string]string{"error": msg})
-}
-
-func clientIP(r *http.Request) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
 }
 
 type ipRateLimiter struct {

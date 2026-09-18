@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hostrix/hostrix/api/internal/config"
 	"github.com/hostrix/hostrix/api/internal/models"
 
@@ -35,7 +36,7 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 }
 
 func Migrate(db *gorm.DB) error {
-	return db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&models.User{},
 		&models.Session{},
 		&models.Setting{},
@@ -45,5 +46,26 @@ func Migrate(db *gorm.DB) error {
 		&models.Allocation{},
 		&models.Backup{},
 		&models.ServerPermission{},
-	)
+	); err != nil {
+		return err
+	}
+	return seedTemplates(db)
+}
+
+func seedTemplates(db *gorm.DB) error {
+	var count int64
+	if err := db.Model(&models.ServerTemplate{}).Where("slug = ?", "ubuntu").Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	return db.Create(&models.ServerTemplate{
+		UUID:           uuid.NewString(),
+		Name:           "Ubuntu",
+		Slug:           "ubuntu",
+		Description:    "Base Ubuntu 24.04 container (Phase 2)",
+		Image:          "ubuntu/24.04",
+		StartupCommand: "",
+	}).Error
 }

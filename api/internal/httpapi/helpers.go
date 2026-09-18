@@ -1,0 +1,113 @@
+package httpapi
+
+import (
+	"encoding/json"
+	"errors"
+	"net"
+	"net/http"
+	"strings"
+
+	"github.com/hostrix/hostrix/api/internal/auth"
+	"github.com/hostrix/hostrix/api/internal/models"
+)
+
+func decodeJSON(r *http.Request, dst any) error {
+	defer r.Body.Close()
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	return dec.Decode(dst)
+}
+
+func writeJSON(w http.ResponseWriter, code int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func writeError(w http.ResponseWriter, code int, msg string) {
+	writeJSON(w, code, map[string]string{"error": msg})
+}
+
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+func publicUser(u *models.User) map[string]any {
+	return map[string]any{
+		"uuid":     u.UUID,
+		"username": u.Username,
+		"email":    u.Email,
+		"is_admin": u.IsAdmin,
+	}
+}
+
+func publicNode(n *models.Node) map[string]any {
+	return map[string]any{
+		"uuid":               n.UUID,
+		"name":               n.Name,
+		"hostname":           n.Hostname,
+		"address":            n.Address,
+		"port":               n.Port,
+		"status":             n.Status,
+		"last_heartbeat_at":  n.LastHeartbeatAt,
+		"cpu_percent":        n.CPUPercent,
+		"memory_usage_bytes": n.MemoryUsageBytes,
+		"memory_total_bytes": n.MemoryTotalBytes,
+		"disk_usage_bytes":   n.DiskUsageBytes,
+		"disk_total_bytes":   n.DiskTotalBytes,
+		"container_count":    n.ContainerCount,
+		"created_at":         n.CreatedAt,
+	}
+}
+
+func publicServer(s *models.Server) map[string]any {
+	return map[string]any{
+		"uuid":           s.UUID,
+		"name":           s.Name,
+		"node_id":        s.NodeID,
+		"template_id":    s.TemplateID,
+		"container_name": s.ContainerName,
+		"memory":         s.MemoryMB,
+		"cpu":            s.CPULimit,
+		"disk":           s.DiskMB,
+		"status":         s.Status,
+		"created_at":     s.CreatedAt,
+	}
+}
+
+func (s *Server) requireUser(w http.ResponseWriter, r *http.Request) (*models.User, bool) {
+	user, err := s.auth.Authenticate(r)
+	if errors.Is(err, auth.ErrUnauthorized) {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return nil, false
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "auth failed")
+		return nil, false
+	}
+	return user, true
+}
+
+func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) (*models.User, bool) {
+	user, ok := s.requireUser(w, r)
+	if !ok {
+		return nil, false
+	}
+	if !user.IsAdmin {
+		writeError(w, http.StatusForbidden, "admin required")
+		return nil, false
+	}
+	return user, true
+}
+
+func bearerToken(r *http.Request) string {
+	h := r.Header.Get("Authorization")
+	if strings.HasPrefix(strings.ToLower(h), "bearer ") {
+		return strings.TrimSpace(h[7:])
+	}
+	return ""
+}

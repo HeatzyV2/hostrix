@@ -5,10 +5,12 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/hostrix/hostrix/api/internal/config"
 	"github.com/hostrix/hostrix/api/internal/database"
 	"github.com/hostrix/hostrix/api/internal/httpapi"
+	"github.com/hostrix/hostrix/api/internal/nodes"
 	"github.com/hostrix/hostrix/api/internal/users"
 )
 
@@ -32,6 +34,16 @@ func main() {
 	}
 
 	server := httpapi.NewServer(cfg, db)
+
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			if err := nodes.MarkStaleOffline(db, 45*time.Second); err != nil {
+				log.Printf("mark stale nodes: %v", err)
+			}
+		}
+	}()
 
 	go func() {
 		log.Printf("hostrix-api listening on %s", cfg.HTTPAddr)

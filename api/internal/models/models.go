@@ -39,16 +39,23 @@ type Setting struct {
 }
 
 type Node struct {
-	ID        uint64    `gorm:"primaryKey" json:"id"`
-	UUID      string    `gorm:"size:36;uniqueIndex;not null" json:"uuid"`
-	Name      string    `gorm:"size:128;not null" json:"name"`
-	Hostname  string    `gorm:"size:255;not null" json:"hostname"`
-	Address   string    `gorm:"size:255;not null" json:"address"`
-	Port      int       `gorm:"not null;default:8081" json:"port"`
-	TokenHash string    `gorm:"size:64;not null" json:"-"`
-	Status    string    `gorm:"size:32;not null;default:OFFLINE" json:"status"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID               uint64     `gorm:"primaryKey" json:"id"`
+	UUID             string     `gorm:"size:36;uniqueIndex;not null" json:"uuid"`
+	Name             string     `gorm:"size:128;not null" json:"name"`
+	Hostname         string     `gorm:"size:255;not null" json:"hostname"`
+	Address          string     `gorm:"size:255;not null" json:"address"`
+	Port             int        `gorm:"not null;default:8081" json:"port"`
+	Token            string     `gorm:"size:128;not null" json:"-"` // node secret; never exposed via API JSON
+	Status           string     `gorm:"size:32;not null;default:OFFLINE" json:"status"`
+	LastHeartbeatAt  *time.Time `json:"last_heartbeat_at"`
+	CPUPercent       float64    `gorm:"not null;default:0" json:"cpu_percent"`
+	MemoryUsageBytes int64      `gorm:"not null;default:0" json:"memory_usage_bytes"`
+	MemoryTotalBytes int64      `gorm:"not null;default:0" json:"memory_total_bytes"`
+	DiskUsageBytes   int64      `gorm:"not null;default:0" json:"disk_usage_bytes"`
+	DiskTotalBytes   int64      `gorm:"not null;default:0" json:"disk_total_bytes"`
+	ContainerCount   int        `gorm:"not null;default:0" json:"container_count"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
 }
 
 type ServerTemplate struct {

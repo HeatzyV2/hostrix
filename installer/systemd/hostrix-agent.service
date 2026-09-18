@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-EnvironmentFile=-/etc/hostrix/agent.env
+EnvironmentFile=/etc/hostrix/agent.env
 WorkingDirectory=/opt/hostrix
 ExecStart=/opt/hostrix/bin/hostrix-agent
 Restart=on-failure

@@ -17,10 +17,14 @@ git checkout -f FETCH_HEAD
 cd "${HOSTRIX_INSTALL_DIR}/api"
 go build -o "${HOSTRIX_INSTALL_DIR}/bin/hostrix-api" ./cmd/hostrix-api
 
+cd "${HOSTRIX_INSTALL_DIR}/agent"
+go build -o "${HOSTRIX_INSTALL_DIR}/bin/hostrix-agent" ./cmd/hostrix-agent
+
 cd "${HOSTRIX_INSTALL_DIR}/panel"
 npm ci || npm install
 npm run build
 
 systemctl restart hostrix-api
 systemctl restart hostrix-panel
+systemctl try-restart hostrix-agent
 echo "Hostrix upgraded."

@@ -90,13 +90,14 @@ Phase 1 est développable sans Incus. L’API doit démarrer avec MariaDB access
 - [x] Installer one-liner (skeleton fonctionnel)
 - [x] README + `.env.example`
 
-### Phase 2 — Incus + Agent
+### Phase 2 — Incus + Agent *(terminée côté code)*
 
-- Interface `ContainerManager` + `IncusContainerManager`
-- Agent authentifié (token Node)
-- Create / delete / start / stop / restart / kill
-- Heartbeat Node → API
-
+- [x] Interface `ContainerManager` + `IncusContainerManager`
+- [x] Agent authentifié (token Node)
+- [x] Create / delete / start / stop / restart / kill
+- [x] Heartbeat Node → API
+- [x] API nodes + servers lifecycle
+- [x] Panel Nodes / Servers UI
 ### Phase 3 — Servers UI + Console + Metrics
 
 - CRUD servers UI

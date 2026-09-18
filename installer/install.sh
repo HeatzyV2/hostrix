@@ -124,8 +124,34 @@ setup_mariadb() {
   ok "MariaDB database ${HOSTRIX_DB_NAME} ready"
 }
 
-install_incus_hint() {
-  log "Incus will be required in Phase 2. Skipping Incus install for Phase 1."
+install_incus() {
+  if command -v incus >/dev/null 2>&1; then
+    ok "Incus already installed"
+    return
+  fi
+  log "Installing Incus..."
+  # Official Zabbly packages are preferred on Ubuntu; fall back to message if unavailable.
+  if [[ "${OS_ID}" == "ubuntu" || "${OS_ID}" == "debian" ]]; then
+    apt-get install -y curl gnupg
+    mkdir -p /etc/apt/keyrings
+    if curl -fsSL https://pkgs.zabbly.com/key.asc -o /etc/apt/keyrings/zabbly.asc 2>/dev/null; then
+      echo "deb [signed-by=/etc/apt/keyrings/zabbly.asc] https://pkgs.zabbly.com/incus/stable $(. /etc/os-release && echo ${VERSION_CODENAME}) main" \
+        >/etc/apt/sources.list.d/zabbly-incus-stable.list
+      apt-get update -y
+      apt-get install -y incus
+    else
+      log "Could not reach Zabbly Incus packages. Install Incus manually, then re-run."
+      return
+    fi
+  fi
+  if command -v incus >/dev/null 2>&1; then
+    # Minimal init for fresh installs (non-interactive best-effort)
+    if ! incus info >/dev/null 2>&1; then
+      log "Initializing Incus (minimal)..."
+      incus admin init --auto || true
+    fi
+    ok "Incus ready"
+  fi
 }
 
 fetch_source() {
@@ -146,6 +172,10 @@ build_hostrix() {
   log "Building API..."
   cd "${HOSTRIX_INSTALL_DIR}/api"
   /usr/local/go/bin/go build -o "${HOSTRIX_INSTALL_DIR}/bin/hostrix-api" ./cmd/hostrix-api
+
+  log "Building Agent..."
+  cd "${HOSTRIX_INSTALL_DIR}/agent"
+  /usr/local/go/bin/go build -o "${HOSTRIX_INSTALL_DIR}/bin/hostrix-agent" ./cmd/hostrix-agent
 
   log "Building Panel..."
   cd "${HOSTRIX_INSTALL_DIR}/panel"
@@ -191,7 +221,7 @@ print_summary() {
   echo "  Config    : /etc/hostrix/hostrix.env"
   echo "  Install   : ${HOSTRIX_INSTALL_DIR}"
   echo
-  echo "Note: Incus/Agent features arrive in Phase 2."
+  echo "Note: Create a Node in the panel, then configure /etc/hostrix/agent.env and start hostrix-agent."
 }
 
 main() {
@@ -200,7 +230,7 @@ main() {
   detect_arch
   install_packages
   setup_mariadb
-  install_incus_hint
+  install_incus
   fetch_source
   mkdir -p "${HOSTRIX_INSTALL_DIR}/bin"
   write_env
